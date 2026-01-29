@@ -16,15 +16,15 @@ from rcn_core.storage.target_storage import MultiTargetStorage
 # Data needs to be loaded before APP
 def init_config():
     # Attempt to load rcn_exports from the project root
+    exports_pkg = None
     try:
         import rcn_exports
-        from rcn_core.parse_yaml import register_package_exports
-        register_package_exports(rcn_exports)
+        exports_pkg = rcn_exports
     except ImportError:
         pass
 
     try:
-        load_files()
+        load_files(exports=exports_pkg)
     except yml_err.YAMLError as error:
         rlog(f"there was an error while loading the yaml files {error}", level="error")
 
