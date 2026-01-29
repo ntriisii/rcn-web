@@ -1,0 +1,20 @@
+[project]
+name = "rcn_web"
+version = "0.1.0"
+description = "Web Reconnaissance for RCN Server"
+authors = [{name = "ntriisii" }]
+dependencies = [
+    "uvicorn",
+    "aiohttp",
+    "aiofiles",
+    "fastapi",
+    "mitmproxy>=10.4.0",
+    "rcn_core",
+]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rcn_web"]
