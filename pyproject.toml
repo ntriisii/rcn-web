@@ -9,12 +9,8 @@ dependencies = [
     "aiofiles",
     "fastapi",
     "mitmproxy>=10.4.0",
-    "rcn_core",
+    "rcn_core @ file:///home/ahmed/programming-projects/python/rcn-core",
 ]
-
-[build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["rcn_web"]
