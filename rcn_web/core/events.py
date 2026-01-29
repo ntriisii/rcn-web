@@ -6,8 +6,10 @@ from rcn_core.globals import RCN_FLOWS
 from rcn_core.storage.bases import get_storage_create
 from rcn_web.core.scope import get_config_wildcards, get_config_urls
 from rcn_web.core.utils import web_match_storage
+from rcn_core.decorators import rcn_event
 
 
+@rcn_event()
 async def handle_init_target(event, scheduled_md):
     event_ctx = event.copy()
     event_ctx["require-storage"] = "targets"

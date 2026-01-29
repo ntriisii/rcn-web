@@ -8,8 +8,10 @@ from rcn_core.data_access import storage
 from rcn_core.data_access import get_unprocessed_annotations, get_unprocessed_entries
 from rcn_web.core.utils import mcp_server_user_interaction, web_match_storage
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
+from rcn_core.decorators import rcn_event
 
 
+@rcn_event()
 async def mcp_ai_tag_apps_for_scanning(event, scheduled_md):
     """
     Prompt the AI to tag applications for Nuclei scanning and Fuzzing.
@@ -93,6 +95,7 @@ def generate_wordlist():
              print("No terminal available or error sending data.")
 
 
+@rcn_event()
 async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
     """
     Collects application annotations with 'todo' keys and sends them to an AI service via WebSocket.
@@ -174,6 +177,7 @@ async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
              print("No terminal available or error sending data.")
 
 
+@rcn_event()
 async def mcp_ai_perform_scanning(event, scheduled_md):
     """
     Scans for 'tool-scanning' notes and executes the requested tools.
@@ -250,6 +254,7 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
                     print(f"[AI-SCAN] Error processing scanning annotation {entry.get('id')}: {e}")
 
 
+@rcn_event()
 async def mcp_ai_perform_fuzzing(event, scheduled_md):
     """
     Scans for 'tool-fuzzing' notes and executes the requested tools.

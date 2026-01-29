@@ -8,8 +8,10 @@ from collections import defaultdict
 from urllib.parse import urlparse
 
 from rcn_web.flows import *
+from rcn_core.decorators import rcn_event
 
 
+@rcn_event()
 async def trufflehog_check_for_flow_secrets(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
@@ -29,6 +31,7 @@ async def trufflehog_check_for_flow_secrets(event, scheduled_md):
         if results: await trufflehog_store_data(storage(), event, {"data": results})
 
 
+@rcn_event()
 async def collect_in_scope_urls(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
@@ -52,6 +55,7 @@ async def collect_in_scope_urls(event, scheduled_md):
             await handle_collected_urls(storage(), event, results)
 
 
+@rcn_event()
 async def collect_js_files(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
@@ -71,6 +75,7 @@ async def collect_js_files(event, scheduled_md):
         if results: await handle_collected_js_files(storage(), event, results)
 
 
+@rcn_event()
 async def store_app_flows(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
@@ -108,6 +113,7 @@ async def store_app_flows(event, scheduled_md):
                 flow_storage.add_many(items_to_store, source="proxy")
 
 
+@rcn_event()
 async def store_js_flows(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:

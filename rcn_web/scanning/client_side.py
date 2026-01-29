@@ -9,8 +9,10 @@ from rcn_core.data_access import get_unprocessed_entries
 from rcn_web.core.utils import web_match_storage
 from rcn_core.storage.bases import add_annotation as global_add_annotation
 from pentest_utils.web import HeadlessBrowser
+from rcn_core.decorators import rcn_event
 
 
+@rcn_event()
 async def scan_client_side_reflected_content(event, scheduled_md):
     """
     Scans for Reflected XSS by fuzzing query parameters found in the referenced entry's path.

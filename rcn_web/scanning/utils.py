@@ -31,6 +31,7 @@ from rcn_web.core.utils import parse_json, web_match_storage, get_app_by_site
 
 # from rcn_web.storage.url import handle_crawling_collected_urls
 from rcn_core.data_access import get_unprocessed_entries
+from rcn_core.decorators import rcn_event
 
 
 
@@ -107,6 +108,7 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
                 site_vuln_ids.append(entry["template-id"])
 
 
+@rcn_event()
 async def crawl_application(event, scheduled_md):
     kt_additional_args = event.get("katana-args", "")
     scanner_name = event["name"]
@@ -154,6 +156,7 @@ async def run_nuclei_scan(targets_file_path, templates_path, nuclei_args, timeou
     return results
 
 
+@rcn_event()
 async def nuclei_scan_apps(event, scheduled_md, matched_storage=[]):
     fn_name = event["name"]
     timeout = event.get("timeout")
@@ -212,6 +215,7 @@ async def run_ffuf_scan(target_url, wordlists, additional_args="", timeout=None,
     return parse_ffuf_content(to_add)
 
 
+@rcn_event()
 async def application_fuzzing(event, scheduled_md, matched_storage=[]):
 
     fn_name = event["name"]

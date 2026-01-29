@@ -8,6 +8,7 @@ from rcn_core.data_access import get_unprocessed_entries
 from rcn_web.core.utils import get_app_by_site, web_match_storage
 from rcn_core.utils import flow_in_scope
 from rcn_core.storage.bases import add_annotation as global_add_annotation
+from rcn_core.decorators import rcn_event
 
 # --- Constants ---
 
@@ -416,6 +417,7 @@ def parseContentSecurityPolicy(header_name, header_value, url):
 
 # --- Scheduled Function ---
 
+@rcn_event()
 async def py_check_csp_bypass(event, scheduled_md):
     scanner_name = event["name"]
     async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:

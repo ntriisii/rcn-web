@@ -12,9 +12,10 @@ from rcn_web.core.utils import parse_json, web_match_storage
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
 from pentest_utils.ai import ai_ask
 from .utils import get_unprocessed_entries
+from rcn_core.decorators import rcn_event
 
 
-
+@rcn_event()
 async def ai_annotate_link_entries(event, scheduled_md):
     
     def _annotate_link(link_id, annotation, tag, link_id_mappings):
