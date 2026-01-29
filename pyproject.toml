@@ -9,6 +9,8 @@ dependencies = [
     "aiofiles",
     "fastapi",
     "mitmproxy>=10.4.0",
+		"watchdog",
+		"pentest_utils @ file:///home/ahmed/programming-projects/python/pentest-utils",
     "rcn_core @ file:///home/ahmed/programming-projects/python/rcn-core",
 ]
 
