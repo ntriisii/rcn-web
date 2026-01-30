@@ -18,16 +18,22 @@ def get_scope_wildcards(data):
 def get_config_wildcards(config: dict):
     wildcards = []
     
-    # Check for the raw targets data loaded from targets.yaml
-    targets_data = config.get("targets", {})
-    
-    if targets_data:
-        for target_name, target_info in targets_data.items():
-            if not isinstance(target_info, dict): continue
-            t_scope = target_info.get("scope", {})
-            if isinstance(t_scope, dict):
-                wildcards.extend(t_scope.get("wildcards", []))
+    # 1. Check if this is a target-specific config
+    t_scope = config.get("scope", {})
+    if isinstance(t_scope, dict) and "wildcards" in t_scope:
+        wildcards.extend(t_scope.get("wildcards", []))
+
+    # 2. Check if this is the global targets data
+    else:
+        targets_data = config.get("targets", {})
+        if targets_data:
+            for target_name, target_info in targets_data.items():
+                if not isinstance(target_info, dict): continue
+                t_scope = target_info.get("scope", {})
+                if isinstance(t_scope, dict):
+                    wildcards.extend(t_scope.get("wildcards", []))
                 
+    if wildcards:
         return [i.replace("*.", "").replace("*", "") for i in wildcards]
 
     # Fallback to old structure
@@ -59,40 +65,32 @@ def get_config_wildcards(config: dict):
 def get_config_urls(config: dict):
     urls = []
     
-    # Check for the raw targets data loaded from targets.yaml
-    targets_data = config.get("targets", {})
-    
-    if targets_data:
-        for target_name, target_info in targets_data.items():
-            if not isinstance(target_info, dict): continue
-            t_scope = target_info.get("scope", {})
-            if isinstance(t_scope, dict):
-                t_urls = t_scope.get("urls", [])
-                if isinstance(t_urls, list):
-                    urls.extend(t_urls)
-                elif isinstance(t_urls, str):
-                    urls.append(t_urls)
+    # 1. Check if this is a target-specific config
+    t_scope = config.get("scope", {})
+    if isinstance(t_scope, dict) and "urls" in t_scope:
+        t_urls = t_scope.get("urls", [])
+        if isinstance(t_urls, list):
+            urls.extend(t_urls)
+        elif isinstance(t_urls, str):
+            urls.append(t_urls)
+
+    # 2. Check if this is the global targets data
+    else:
+        targets_data = config.get("targets", {})
+        if targets_data:
+            for target_name, target_info in targets_data.items():
+                if not isinstance(target_info, dict): continue
+                t_scope = target_info.get("scope", {})
+                if isinstance(t_scope, dict):
+                    t_urls = t_scope.get("urls", [])
+                    if isinstance(t_urls, list):
+                        urls.extend(t_urls)
+                    elif isinstance(t_urls, str):
+                        urls.append(t_urls)
+    if urls:
         return urls
 
-    scope = config.get("scope", [])
-    if not scope: return []
-    is_multitarget = config.get("multitarget", False)
-    all_urls = []
-    if is_multitarget and isinstance(scope, dict):
-        for target_name, target_scope in scope.items():
-            target_urls = [
-                i["asset_identifier"]
-                for i in target_scope
-                if i["asset_type"] == "URL"
-            ]
-            all_urls.extend(target_urls)
-    elif isinstance(scope, list):
-        all_urls = [
-            i["asset_identifier"]
-            for i in scope
-            if i["asset_type"] == "URL"
-        ]
-    return all_urls
+    # Fallback to old structure
 
 def get_target_scope():
     scope = dict()
