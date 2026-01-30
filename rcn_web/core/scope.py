@@ -4,10 +4,14 @@ from urllib.parse import urlparse
 
 def get_scope_urls(data):
     config = rcn_core.globals.TARGET_CONFIG
+    if not config.get("engagement-scope"):
+        config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_urls(config)
 
 def get_scope_wildcards(data):
     config = rcn_core.globals.TARGET_CONFIG
+    if not config.get("engagement-scope"):
+        config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_wildcards(config)
 
 def get_config_wildcards(config: dict):
@@ -15,14 +19,25 @@ def get_config_wildcards(config: dict):
     if config.get("engagement-scope"):
         scope_data = config["engagement-scope"]
         wildcards = []
-        if isinstance(scope_data, dict):
-            # Check for 'assets' or 'targets' list
+        
+        # 1. Raw targets_data structure (target-based)
+        if "targets_data" in scope_data:
+            targets_data = scope_data["targets_data"]
+            for target_name, target_info in targets_data.items():
+                if not isinstance(target_info, dict): continue
+                t_scope = target_info.get("scope", {})
+                if isinstance(t_scope, dict):
+                    wildcards.extend(t_scope.get("wildcards", []))
+        
+        # 2. Legacy 'assets' or 'targets' list
+        elif isinstance(scope_data, dict):
             targets = scope_data.get("assets", []) + scope_data.get("targets", [])
             for t in targets:
                 if t.get("type") == "wildcard":
                     wildcards.append(t.get("value"))
                 elif t.get("type") == "domain" and t.get("wildcard", False):
                     wildcards.append(t.get("value"))
+        
         return [i.replace("*.", "").replace("*", "") for i in wildcards]
 
     # Fallback to old structure
@@ -56,7 +71,22 @@ def get_config_urls(config: dict):
     if config.get("engagement-scope"):
         scope_data = config["engagement-scope"]
         urls = []
-        if isinstance(scope_data, dict):
+        
+        # 1. Raw targets_data structure (target-based)
+        if "targets_data" in scope_data:
+            targets_data = scope_data["targets_data"]
+            for target_name, target_info in targets_data.items():
+                if not isinstance(target_info, dict): continue
+                t_scope = target_info.get("scope", {})
+                if isinstance(t_scope, dict):
+                    t_urls = t_scope.get("urls", [])
+                    if isinstance(t_urls, list):
+                        urls.extend(t_urls)
+                    elif isinstance(t_urls, str):
+                        urls.append(t_urls)
+        
+        # 2. Legacy 'assets' or 'targets' list
+        elif isinstance(scope_data, dict):
             targets = scope_data.get("assets", []) + scope_data.get("targets", [])
             for t in targets:
                 if t.get("type") == "url":

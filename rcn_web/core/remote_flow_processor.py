@@ -3,7 +3,7 @@ from rcn_core.log import rlog
 from rcn_core.data_access import storage, get_unprocessed_entries
 from rcn_web.core.utils import web_match_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create
-from rcn_core.utils import flow_in_scope
+from rcn_web.core.scope import flow_in_scope
 from collections import defaultdict
 from urllib.parse import urlparse
 

@@ -38,12 +38,29 @@ def get_scope_identities():
     Supports both legacy 'scope' (list of dicts) and new 'engagement-scope' (assets/targets).
     """
     config = rcn_core.globals.TARGET_CONFIG
+    if not config.get("engagement-scope"):
+        config = rcn_core.globals.YAML_FILE_CONTENT
+
     identities = []
     
     # 1. New 'engagement-scope' structure
     if config.get("engagement-scope"):
         scope_data = config["engagement-scope"]
         if isinstance(scope_data, dict):
+            # Raw targets_data structure
+            if "targets_data" in scope_data:
+                targets_data = scope_data["targets_data"]
+                for target_name, target_info in targets_data.items():
+                    if not isinstance(target_info, dict): continue
+                    t_scope = target_info.get("scope", {})
+                    if isinstance(t_scope, dict):
+                        identities.extend(t_scope.get("wildcards", []))
+                        t_urls = t_scope.get("urls", [])
+                        if isinstance(t_urls, list):
+                            identities.extend(t_urls)
+                        elif isinstance(t_urls, str):
+                            identities.append(t_urls)
+
             # Collect from both 'assets' and 'targets'
             for category in ["assets", "targets"]:
                 items = scope_data.get(category, [])

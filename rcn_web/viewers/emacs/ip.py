@@ -10,7 +10,7 @@ from pentest_utils.viewers.emacs.utils import make_org_link
 from .utils import *
 from rcn_web.core.utils import storage
 from rcn_web.storage.ip import get_shodan_ip_data
-from rcn_web.core.utils import get_inscope_domains
+from rcn_web.core.scope import get_inscope_domains
 from rcn_web.storage.ip import shodan_internetdb_port_scan
 
 
@@ -427,7 +427,7 @@ def elisp_make_ip_view(ip):
                     "elisp:(rcn-view--view-app-org-content " f'"{app['site']}")',
                     desc=app['site'],
                 )
-                for app in get_uniq_apps(s)t)orage()
+                for app in get_uniq_apps(s)
                 if app.host == ip
             ],
         )

@@ -19,7 +19,7 @@ from .dorks import arrange_github_dorks_views
 from .dorks import arrange_shodan_dorks_views
 
 from rcn_web import storage
-from rcn_core.utils import get_scope_wildcards
+from rcn_web.core.scope import get_scope_wildcards
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
 
 from pentest_utils.viewers.emacs.utils import make_org_link
@@ -285,7 +285,7 @@ def elisp_make_target_view_data():
 
     st = storage()
     org_entries = {
-        "Apps count": len(get_uniq_apps(s)t)),
+        "Apps count": len(get_uniq_apps(s)),
         "IPs count": st.get_storage_create("found-ips").length,
     }
 

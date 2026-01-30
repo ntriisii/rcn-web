@@ -9,10 +9,10 @@ from contextlib import asynccontextmanager
 from functools import partial
 
 from rcn_web.core.utils import storage
-from rcn_web.core.utils import parse_json, web_match_storage
+from rcn_web.core.utils import web_match_storage
 from pentest_utils.ai import ai_ask
 from .utils import get_unprocessed_entries
-
+from rcn_core.utils import parse_json
 
 
 async def scan_xss(event, scheduled_md):

@@ -215,7 +215,7 @@ async def preview_apps(request: AppPreviewRequest):
         found = None
         # Try finding by ID first
         if isinstance(ident, int) or (isinstance(ident, str) and ident.isdigit()):
-             found = next((a for a in get_uniq_apps(s)t) if str(a['id']) == str(ident)), None)
+             found = next((a for a in get_uniq_apps(s) if str(a['id']) == str(ident)), None)
         
         # If not found or not ID, try by site
         if not found and isinstance(ident, str):

@@ -45,7 +45,6 @@ from rcn_web.core.utils import web_match_storage
 
 # --- Register functions for YAML context ---
 import rcn_web.core.events
-import rcn_web.automation.csp_bypass
 import rcn_web.scanning.mcp_scanners
 import rcn_web.scanning.client_side
 import rcn_web.scanning.app_scans
@@ -57,39 +56,39 @@ import rcn_web.viewers.emacs.flows
 import rcn_web.viewers.emacs.ip
 import rcn_web.viewers.emacs.utils
 import rcn_web.viewers.emacs.dorks
-from pentest_utils.web.rcn_helpers import get_proxy_data # commonly used in yaml
+# from pentest_utils.web.rcn_helpers import get_proxy_data # commonly used in yaml
 
-rcn_core.globals.YAML_CONTEXT.update({
-    "handle_init_target": rcn_web.core.events.handle_init_target,
-    "py_check_csp_bypass": rcn_web.automation.csp_bypass.py_check_csp_bypass,
-    "mcp_ai_tag_apps_for_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_tag_apps_for_scanning,
-    "mcp_interactive_ai_process_todo_notes": rcn_web.scanning.mcp_scanners.mcp_interactive_ai_process_todo_notes,
-    "mcp_ai_perform_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_perform_scanning,
-    "mcp_ai_perform_fuzzing": rcn_web.scanning.mcp_scanners.mcp_ai_perform_fuzzing,
-    "scan_client_side_reflected_content": rcn_web.scanning.client_side.scan_client_side_reflected_content,
-    "ai_annotate_link_entries": rcn_web.scanning.app_scans.ai_annotate_link_entries,
-    "crawl_application": rcn_web.scanning.utils.crawl_application,
-    "nuclei_scan_apps": rcn_web.scanning.utils.nuclei_scan_apps,
-    "application_fuzzing": rcn_web.scanning.utils.application_fuzzing,
-    "trufflehog_check_for_flow_secrets": rcn_web.core.remote_flow_processor.trufflehog_check_for_flow_secrets,
-    "collect_in_scope_urls": rcn_web.core.remote_flow_processor.collect_in_scope_urls,
-    "collect_js_files": rcn_web.core.remote_flow_processor.collect_js_files,
-    "store_app_flows": rcn_web.core.remote_flow_processor.store_app_flows,
-    "store_js_flows": rcn_web.core.remote_flow_processor.store_js_flows,
-    "scan_xss": rcn_web.scanning.owasp.scan_xss,
-    "elisp_view_target_apps": rcn_web.viewers.emacs.target.elisp_view_target_apps,
-    "elisp_view_target_apps_with_links": rcn_web.viewers.emacs.target.elisp_view_target_apps_with_links,
-    "elisp_view_app_todos": rcn_web.viewers.emacs.target.elisp_view_app_todos,
-    "elisp_view_app_flows": rcn_web.viewers.emacs.flows.elisp_view_app_flows,
-    "elisp_make_app_view_data": rcn_web.viewers.emacs.target.elisp_make_app_view_data,
-    "elisp_make_target_view_data": rcn_web.viewers.emacs.target.elisp_make_target_view_data,
-    "arrange_dorks_view": rcn_web.viewers.emacs.dorks.arrange_dorks_view,
-    "arrange_dorks_preview": rcn_web.viewers.emacs.dorks.arrange_dorks_preview,
-    "view_ip_data": rcn_web.viewers.emacs.ip.view_ip_data,
-    "elisp_make_ip_view": rcn_web.viewers.emacs.ip.elisp_make_ip_view,
-    "make_basic_dict_entry_view": rcn_web.viewers.emacs.utils.make_basic_dict_entry_view,
-    "get_proxy_data": get_proxy_data,
-})
+# rcn_core.globals.YAML_CONTEXT.update({
+#     "handle_init_target": rcn_web.core.events.handle_init_target,
+#     "py_check_csp_bypass": rcn_web.automation.csp_bypass.py_check_csp_bypass,
+#     "mcp_ai_tag_apps_for_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_tag_apps_for_scanning,
+#     "mcp_interactive_ai_process_todo_notes": rcn_web.scanning.mcp_scanners.mcp_interactive_ai_process_todo_notes,
+#     "mcp_ai_perform_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_perform_scanning,
+#     "mcp_ai_perform_fuzzing": rcn_web.scanning.mcp_scanners.mcp_ai_perform_fuzzing,
+#     "scan_client_side_reflected_content": rcn_web.scanning.client_side.scan_client_side_reflected_content,
+#     "ai_annotate_link_entries": rcn_web.scanning.app_scans.ai_annotate_link_entries,
+#     "crawl_application": rcn_web.scanning.utils.crawl_application,
+#     "nuclei_scan_apps": rcn_web.scanning.utils.nuclei_scan_apps,
+#     "application_fuzzing": rcn_web.scanning.utils.application_fuzzing,
+#     "trufflehog_check_for_flow_secrets": rcn_web.core.remote_flow_processor.trufflehog_check_for_flow_secrets,
+#     "collect_in_scope_urls": rcn_web.core.remote_flow_processor.collect_in_scope_urls,
+#     "collect_js_files": rcn_web.core.remote_flow_processor.collect_js_files,
+#     "store_app_flows": rcn_web.core.remote_flow_processor.store_app_flows,
+#     "store_js_flows": rcn_web.core.remote_flow_processor.store_js_flows,
+#     "scan_xss": rcn_web.scanning.owasp.scan_xss,
+#     "elisp_view_target_apps": rcn_web.viewers.emacs.target.elisp_view_target_apps,
+#     "elisp_view_target_apps_with_links": rcn_web.viewers.emacs.target.elisp_view_target_apps_with_links,
+#     "elisp_view_app_todos": rcn_web.viewers.emacs.target.elisp_view_app_todos,
+#     "elisp_view_app_flows": rcn_web.viewers.emacs.flows.elisp_view_app_flows,
+#     "elisp_make_app_view_data": rcn_web.viewers.emacs.target.elisp_make_app_view_data,
+#     "elisp_make_target_view_data": rcn_web.viewers.emacs.target.elisp_make_target_view_data,
+#     "arrange_dorks_view": rcn_web.viewers.emacs.dorks.arrange_dorks_view,
+#     "arrange_dorks_preview": rcn_web.viewers.emacs.dorks.arrange_dorks_preview,
+#     "view_ip_data": rcn_web.viewers.emacs.ip.view_ip_data,
+#     "elisp_make_ip_view": rcn_web.viewers.emacs.ip.elisp_make_ip_view,
+#     "make_basic_dict_entry_view": rcn_web.viewers.emacs.utils.make_basic_dict_entry_view,
+#     "get_proxy_data": get_proxy_data,
+# })
 
 # Configure TimeEvent to use web storage matcher
 TimeEvent().set_match_storage_fn(web_match_storage)

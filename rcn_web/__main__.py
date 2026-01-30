@@ -1,3 +1,4 @@
+
 import os
 import sys
 import asyncio
@@ -17,19 +18,13 @@ from rcn_core.storage.target_storage import MultiTargetStorage
 def init_config():
     # Attempt to load rcn_exports from the project root
     exports_pkg = None
-    try:
-        import rcn_exports
-        exports_pkg = rcn_exports
-    except ImportError:
-        pass
+    import rcn_web.rcn_exports
+    exports_pkg = rcn_web.rcn_exports
+    
+    try: load_files(exports=exports_pkg)
+    except yml_err.YAMLError as error: rlog(f"there was an error while loading the yaml files {error}", level="error")
 
-    try:
-        load_files(exports=exports_pkg)
-    except yml_err.YAMLError as error:
-        rlog(f"there was an error while loading the yaml files {error}", level="error")
-
-if __name__ == "__main__":
-    init_config()
+if __name__ == "__main__": init_config()
 
 # Import app after config loading
 from .main import app
@@ -100,8 +95,5 @@ if __name__ == "__main__":
         )
 
         for i in observers:
-            try:
-                i.stop()
-                i.join()
-            except:
-                pass
+            try: i.stop(); i.join()
+            except: pass

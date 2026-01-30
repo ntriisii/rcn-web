@@ -109,7 +109,7 @@ async def add_entry_annotation(req: Request):
                 # If we are in 'web-apps' storage (list of apps), entry_id should be app ID or site.
                 # Currently entry_id is passed from frontend.
                 
-                app = get_app_by_site(target, entry_id) if isinstance(entry_id, (int, str)) and str(entry_id).isdigit() else target, entry_id)
+                app = get_app_by_site(target, entry_id) if isinstance(entry_id, (int, str)) and str(entry_id).isdigit() else target, entry_id
                 if app:
                     nid = global_add_annotation(entry_id=entry_id, storage_name=storage_name, key=key, value=value, parent_id=app['id'])
                     added_annotations.append({
@@ -119,7 +119,7 @@ async def add_entry_annotation(req: Request):
                     })
             else:
                 if ident: 
-                    app = get_app_by_site(target, ident) if is_id else target, ident)
+                    app = get_app_by_site(target, ident) if is_id else target, ident
                 else: 
                     app = target
                 

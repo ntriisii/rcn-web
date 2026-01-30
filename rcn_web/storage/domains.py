@@ -8,7 +8,8 @@ from collections import defaultdict
 import rcn_core.globals
 
 from rcn_core.storage.target_storage import TargetStorage
-from rcn_core.utils import get_scope_wildcards, get_config_wildcards, storage_automation_md_get_create
+from rcn_core.utils import storage_automation_md_get_create
+from rcn_web.core.scope import get_scope_wildcards, get_config_wildcards
 from rcn_core.data_access import get_unprocessed_entries, storage as get_storage
 from rcn_web.core.utils import get_uniq_apps, web_match_storage
 from rcn_core.storage.bases import get_storage_create
