@@ -15,29 +15,18 @@ def get_scope_wildcards(data):
     return get_config_wildcards(config)
 
 def get_config_wildcards(config: dict):
-    # Support new engagement-scope structure
-    if config.get("engagement-scope"):
-        scope_data = config["engagement-scope"]
-        wildcards = []
-        
-        # 1. Raw targets_data structure (target-based)
-        if "targets_data" in scope_data:
-            targets_data = scope_data["targets_data"]
-            for target_name, target_info in targets_data.items():
-                if not isinstance(target_info, dict): continue
-                t_scope = target_info.get("scope", {})
-                if isinstance(t_scope, dict):
-                    wildcards.extend(t_scope.get("wildcards", []))
-        
-        # 2. Legacy 'assets' or 'targets' list
-        elif isinstance(scope_data, dict):
-            targets = scope_data.get("assets", []) + scope_data.get("targets", [])
-            for t in targets:
-                if t.get("type") == "wildcard":
-                    wildcards.append(t.get("value"))
-                elif t.get("type") == "domain" and t.get("wildcard", False):
-                    wildcards.append(t.get("value"))
-        
+    wildcards = []
+    
+    # Check for the raw targets data loaded from targets.yaml
+    targets_data = config.get("engagement-scope", {}).get("targets_data", {})
+    
+    if targets_data:
+        for target_name, target_info in targets_data.items():
+            if not isinstance(target_info, dict): continue
+            t_scope = target_info.get("scope", {})
+            if isinstance(t_scope, dict):
+                wildcards.extend(t_scope.get("wildcards", []))
+                
         return [i.replace("*.", "").replace("*", "") for i in wildcards]
 
     # Fallback to old structure
@@ -67,30 +56,21 @@ def get_config_wildcards(config: dict):
     return wild_cards
 
 def get_config_urls(config: dict):
-    # Support new engagement-scope structure
-    if config.get("engagement-scope"):
-        scope_data = config["engagement-scope"]
-        urls = []
-        
-        # 1. Raw targets_data structure (target-based)
-        if "targets_data" in scope_data:
-            targets_data = scope_data["targets_data"]
-            for target_name, target_info in targets_data.items():
-                if not isinstance(target_info, dict): continue
-                t_scope = target_info.get("scope", {})
-                if isinstance(t_scope, dict):
-                    t_urls = t_scope.get("urls", [])
-                    if isinstance(t_urls, list):
-                        urls.extend(t_urls)
-                    elif isinstance(t_urls, str):
-                        urls.append(t_urls)
-        
-        # 2. Legacy 'assets' or 'targets' list
-        elif isinstance(scope_data, dict):
-            targets = scope_data.get("assets", []) + scope_data.get("targets", [])
-            for t in targets:
-                if t.get("type") == "url":
-                    urls.append(t.get("value"))
+    urls = []
+    
+    # Check for the raw targets data loaded from targets.yaml
+    targets_data = config.get("engagement-scope", {}).get("targets_data", {})
+    
+    if targets_data:
+        for target_name, target_info in targets_data.items():
+            if not isinstance(target_info, dict): continue
+            t_scope = target_info.get("scope", {})
+            if isinstance(t_scope, dict):
+                t_urls = t_scope.get("urls", [])
+                if isinstance(t_urls, list):
+                    urls.extend(t_urls)
+                elif isinstance(t_urls, str):
+                    urls.append(t_urls)
         return urls
 
     scope = config.get("scope", [])
