@@ -1,16 +1,17 @@
+
 import re
 import rcn_core.globals
 from urllib.parse import urlparse
 
 def get_scope_urls(data):
     config = rcn_core.globals.TARGET_CONFIG
-    if not config.get("engagement-scope"):
+    if not config.get("targets"):
         config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_urls(config)
 
 def get_scope_wildcards(data):
     config = rcn_core.globals.TARGET_CONFIG
-    if not config.get("engagement-scope"):
+    if not config.get("targets"):
         config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_wildcards(config)
 
@@ -18,7 +19,7 @@ def get_config_wildcards(config: dict):
     wildcards = []
     
     # Check for the raw targets data loaded from targets.yaml
-    targets_data = config.get("engagement-scope", {}).get("targets_data", {})
+    targets_data = config.get("targets", {})
     
     if targets_data:
         for target_name, target_info in targets_data.items():
@@ -59,7 +60,7 @@ def get_config_urls(config: dict):
     urls = []
     
     # Check for the raw targets data loaded from targets.yaml
-    targets_data = config.get("engagement-scope", {}).get("targets_data", {})
+    targets_data = config.get("targets", {})
     
     if targets_data:
         for target_name, target_info in targets_data.items():
