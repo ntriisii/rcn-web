@@ -92,7 +92,7 @@ async def add_entry_annotation(req: Request):
     if isinstance(app_ids, (str, int)): app_ids = [app_ids]
     if isinstance(storage_names, str): storage_names = [storage_names]
     
-    target = storage() 
+    target = get_storage() 
     added_annotations = []
     
     # Prioritize app_ids if present, otherwise use app_names
@@ -106,7 +106,7 @@ async def add_entry_annotation(req: Request):
                 # We want to add a note to the application itself.
                 # If ident is None (target level?), usually entry_id is the site.
                 # But here we are adding to an entry.
-                # If we are in 'web-apps' storage (list of apps), entry_id should be app ID or site.
+                # If we are in 'web-apps' get_storage (list of apps), entry_id should be app ID or site.
                 # Currently entry_id is passed from frontend.
                 
                 app = get_app_by_site(target, entry_id) if isinstance(entry_id, (int, str)) and str(entry_id).isdigit() else target, entry_id

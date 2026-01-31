@@ -4,7 +4,7 @@ import sys
 import aiohttp
 import asyncio
 
-from rcn_core.data_access import storage
+from rcn_core.data_access import get_storage
 from rcn_core.data_access import get_unprocessed_annotations, get_unprocessed_entries
 from rcn_web.core.utils import mcp_server_user_interaction, web_match_storage
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
@@ -131,7 +131,7 @@ async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
         ai_payload += """**Very Important**:
   Strict Operational Constraints:
    1. No Discovery: Do not attempt to list all storages or applications to 'understand the environment.' Work
-      exclusively with the specific application(s) and storage(s) explicitly provided in the request.
+      exclusively with the specific application(s) and get_storage(s) explicitly provided in the request.
    2. No Assumptions: Do not assume tool capabilities beyond their documented descriptions. Do not guess or 'try'
       storage names (e.g., 'todos', 'functions'); only use storage names that have been confirmed for the target
       application.

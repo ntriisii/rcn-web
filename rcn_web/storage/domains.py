@@ -1,8 +1,10 @@
+
+import os
+import sys
 import re
 import validators
 import datetime
 import asyncio
-
 from collections import defaultdict
 
 import rcn_core.globals
@@ -10,7 +12,7 @@ import rcn_core.globals
 from rcn_core.storage.target_storage import TargetStorage
 from rcn_core.utils import storage_automation_md_get_create
 from rcn_web.core.scope import get_scope_wildcards, get_config_wildcards
-from rcn_core.data_access import get_unprocessed_entries, storage as get_storage
+from rcn_core.data_access import get_unprocessed_entries, get_storage as get_storage
 from rcn_web.core.utils import get_uniq_apps, web_match_storage
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
@@ -249,3 +251,8 @@ async def periodic_subdomain_bruteforcing(event, scheduled_md, matched_storages=
     # store back the data in the storage
     last_check = (served_count * chunk_length) + (last_checked_index or 0)
     scheduled_md["last-checked-index"] = last_check
+
+def store_domains_in_file(domains):
+    with open(os.path.join(sys.argv[1], "domains.txt"), "a+") as f:
+        for d in domains:
+            f.write(d + "\n")

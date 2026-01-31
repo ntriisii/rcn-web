@@ -20,10 +20,10 @@ from contextlib import asynccontextmanager
 
 import rcn_core.globals as cglobals
 
-from rcn_core.data_access import storage, rr_server_hosts_stats, rr_server_remote_hosts_count
+from rcn_core.data_access import get_storage, rr_server_hosts_stats, rr_server_remote_hosts_count
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
-from rcn_core.data_access import storage
+from rcn_core.data_access import get_storage
 from rcn_web.config import *
 from rcn_web.core.utils import web_match_storage, get_app_by_site
 from rcn_core.utils import parse_json
@@ -85,7 +85,7 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
 
         found_apps[site].append(entry)
 
-    s = storage()
+    s = get_storage()
     for site in found_apps:
         app = get_app_by_site(s, site)
         data = found_apps[site]

@@ -38,7 +38,7 @@ class ScanResultsRequest(BaseModel):
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 def _resolve_storage(storage_name: str, parent_id: Optional[int | str] = None):
-    st = storage()
+    st = get_storage()
     if not st: 
         return None
     
@@ -80,7 +80,7 @@ def _render_storage_view(target_storage, page=1, limit=500, sql_filter=None, is_
 async def check_scan_results(request: ScanResultsRequest):
     from fastapi.responses import JSONResponse
     
-    st = storage()
+    st = get_storage()
     app = None
     if request.app_id:
         app = st, request.app_id

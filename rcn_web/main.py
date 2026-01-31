@@ -58,38 +58,6 @@ import rcn_web.viewers.emacs.utils
 import rcn_web.viewers.emacs.dorks
 # from pentest_utils.web.rcn_helpers import get_proxy_data # commonly used in yaml
 
-# rcn_core.globals.YAML_CONTEXT.update({
-#     "handle_init_target": rcn_web.core.events.handle_init_target,
-#     "py_check_csp_bypass": rcn_web.automation.csp_bypass.py_check_csp_bypass,
-#     "mcp_ai_tag_apps_for_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_tag_apps_for_scanning,
-#     "mcp_interactive_ai_process_todo_notes": rcn_web.scanning.mcp_scanners.mcp_interactive_ai_process_todo_notes,
-#     "mcp_ai_perform_scanning": rcn_web.scanning.mcp_scanners.mcp_ai_perform_scanning,
-#     "mcp_ai_perform_fuzzing": rcn_web.scanning.mcp_scanners.mcp_ai_perform_fuzzing,
-#     "scan_client_side_reflected_content": rcn_web.scanning.client_side.scan_client_side_reflected_content,
-#     "ai_annotate_link_entries": rcn_web.scanning.app_scans.ai_annotate_link_entries,
-#     "crawl_application": rcn_web.scanning.utils.crawl_application,
-#     "nuclei_scan_apps": rcn_web.scanning.utils.nuclei_scan_apps,
-#     "application_fuzzing": rcn_web.scanning.utils.application_fuzzing,
-#     "trufflehog_check_for_flow_secrets": rcn_web.core.remote_flow_processor.trufflehog_check_for_flow_secrets,
-#     "collect_in_scope_urls": rcn_web.core.remote_flow_processor.collect_in_scope_urls,
-#     "collect_js_files": rcn_web.core.remote_flow_processor.collect_js_files,
-#     "store_app_flows": rcn_web.core.remote_flow_processor.store_app_flows,
-#     "store_js_flows": rcn_web.core.remote_flow_processor.store_js_flows,
-#     "scan_xss": rcn_web.scanning.owasp.scan_xss,
-#     "elisp_view_target_apps": rcn_web.viewers.emacs.target.elisp_view_target_apps,
-#     "elisp_view_target_apps_with_links": rcn_web.viewers.emacs.target.elisp_view_target_apps_with_links,
-#     "elisp_view_app_todos": rcn_web.viewers.emacs.target.elisp_view_app_todos,
-#     "elisp_view_app_flows": rcn_web.viewers.emacs.flows.elisp_view_app_flows,
-#     "elisp_make_app_view_data": rcn_web.viewers.emacs.target.elisp_make_app_view_data,
-#     "elisp_make_target_view_data": rcn_web.viewers.emacs.target.elisp_make_target_view_data,
-#     "arrange_dorks_view": rcn_web.viewers.emacs.dorks.arrange_dorks_view,
-#     "arrange_dorks_preview": rcn_web.viewers.emacs.dorks.arrange_dorks_preview,
-#     "view_ip_data": rcn_web.viewers.emacs.ip.view_ip_data,
-#     "elisp_make_ip_view": rcn_web.viewers.emacs.ip.elisp_make_ip_view,
-#     "make_basic_dict_entry_view": rcn_web.viewers.emacs.utils.make_basic_dict_entry_view,
-#     "get_proxy_data": get_proxy_data,
-# })
-
 # Configure TimeEvent to use web storage matcher
 TimeEvent().set_match_storage_fn(web_match_storage)
 
@@ -97,7 +65,7 @@ TimeEvent().set_match_storage_fn(web_match_storage)
 dlls = ctypes.CDLL("libc.so.6")
 
 # NOTE: remove the root_path or include as a cli argument
-app = FastAPI(lifespan=rcn_core.globals.POOL_EXECUTOR, root_path="/test-target")
+app = FastAPI(lifespan=rcn_core.globals.POOL_EXECUTOR, root_path="/new-target")
 
 app.include_router(ip_router)
 app.include_router(domains_router)
@@ -117,7 +85,7 @@ async def run_time_events():
 @app.get("/forceDumpData")
 async def force_dump_data() -> JSONResponse:
 
-    await storage().dump_data(force=True)
+    await get_storage().dump_data(force=True)
     return JSONResponse("success")
 
 
@@ -161,7 +129,7 @@ def getsize(obj_0):
 
 @app.get("/getApp")
 async def get_app_data(app_id):
-    app = get_app_by_site(storage(), app_id)
+    app = get_app_by_site(get_storage(), app_id)
     if not app: return JSONResponse({"error": "app not found"}, status_code=404)
 
     data = elisp_make_app_view_data(app)
@@ -176,7 +144,7 @@ async def get_app_more_data(req: Request):
     include_all_data = data["include-all-data"]
     found_apps = []
     for i in ids:
-        app = get_app_by_site(storage(), i)
+        app = get_app_by_site(get_storage(), i)
         if not app:
             continue
         if not include_all_data:
@@ -263,7 +231,7 @@ async def get_app(content: Request):
         data = arrange_dorks_view()
     elif storage_name == "web-apps":
         data = elisp_view_target_apps(
-            storage(),
+            get_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -275,7 +243,7 @@ async def get_app(content: Request):
     
     elif storage_name == "app-with-links":
         data = elisp_view_target_apps_with_links(
-            storage(),
+            get_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -292,7 +260,7 @@ async def get_app(content: Request):
         data = elisp_view_app_todos(app_id)
     
     # elif storage_name == "app-flows":
-    #     app = get_app_by_site(storage(), app_id)
+    #     app = get_app_by_site(get_storage(), app_id)
     #     if not app:
     #         return JSONResponse({"error": "app not found"}, status_code=404)
             
@@ -308,14 +276,14 @@ async def get_app(content: Request):
     #     )
 
     elif storage_name == "ip":
-        # internetdb_content = storage().get_storage_create('shodan-internetdb-ips').get()
+        # internetdb_content = get_storage().get_storage_create('shodan-internetdb-ips').get()
         # if not internetdb_content:
-        #   ips = [i['ip'] for i in storage().get_storage_create('found-ips').get()]
+        #   ips = [i['ip'] for i in get_storage().get_storage_create('found-ips').get()]
         #   d = await shodan_internetdb_port_scan(ips)
-        #   storage().get_storage_create('shodan-internetdb-ips').add_many(d, source=)
+        #   get_storage().get_storage_create('shodan-internetdb-ips').add_many(d, source=)
 
         data = view_ip_data(
-            storage(),
+            get_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -328,8 +296,8 @@ async def get_app(content: Request):
 
     elif app_id or app_name:
         app = None
-        if app_id: app = get_app_by_site(storage(), app_id)
-        if not app and app_name: app = get_app_by_site(storage(), app_name)
+        if app_id: app = get_app_by_site(get_storage(), app_id)
+        if not app and app_name: app = get_app_by_site(get_storage(), app_name)
         
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
@@ -366,7 +334,7 @@ async def get_data_view(entry, data_storage="app"):
     data = dict()
 
     if data_storage == "app":
-        app = get_app_by_site(storage(), entry)
+        app = get_app_by_site(get_storage(), entry)
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
         data = elisp_make_app_view_data(app)
@@ -401,7 +369,7 @@ async def get_entry_by_id(
 ):
 
     if not app_name:
-        st = storage()[storage_name]
+        st = get_storage()[storage_name]
         if not st:
             return JSONResponse("target storage not found", status_code=404)
         data = [i for i in st.get() if i["id"] == entry_id]
@@ -411,7 +379,7 @@ async def get_entry_by_id(
         e = make_basic_dict_entry_view(data[0])
         return JSONResponse(e)
 
-    app = get_app_by_site(storage(), app_name)
+    app = get_app_by_site(get_storage(), app_name)
     if not app:
         return JSONResponse("app not found", status_code=404)
     st = get_storage_create("web-apps::" + storage_name, parent_id=app['id'])
@@ -446,7 +414,7 @@ async def sync_proxy():
 @app.get("/getAllAnnotations")
 async def get_all_annotations():
     all_annotations = []
-    target = storage()
+    target = get_storage()
     
     # 1. Fetch annotations from relevant target-level storages
     target_storages = ["target", "dorks", "found-ips", "scheduled", "shodan-internetdb-ips"]
@@ -491,6 +459,6 @@ async def get_all_annotations():
 @app.get("debug")
 def debug_scanners():
 
-    scheduled_storage = storage().get_storage_create("scheduled").get()
+    scheduled_storage = get_storage().get_storage_create("scheduled").get()
 
     return JSONResponse(scheduled_storage)

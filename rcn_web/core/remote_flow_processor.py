@@ -1,6 +1,6 @@
 
 from rcn_core.log import rlog
-from rcn_core.data_access import storage, get_unprocessed_entries
+from rcn_core.data_access import get_storage, get_unprocessed_entries
 from rcn_web.core.utils import web_match_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create
 from rcn_web.core.scope import flow_in_scope
@@ -28,7 +28,7 @@ async def trufflehog_check_for_flow_secrets(event, scheduled_md):
                 
             except Exception as e: rlog(f"Error in trufflehog_operate: {e}", level="error")
 
-        if results: await trufflehog_store_data(storage(), event, {"data": results})
+        if results: await trufflehog_store_data(get_storage(), event, {"data": results})
 
 
 @rcn_event()
@@ -52,7 +52,7 @@ async def collect_in_scope_urls(event, scheduled_md):
                 rlog(f"Error in collect_url_content: {e}", level="error")
 
         if results:
-            await handle_collected_urls(storage(), event, results)
+            await handle_collected_urls(get_storage(), event, results)
 
 
 @rcn_event()
@@ -72,7 +72,7 @@ async def collect_js_files(event, scheduled_md):
                 
             except Exception as e: rlog(f"Error in extract_js_files: {e}", level="error")
 
-        if results: await handle_collected_js_files(storage(), event, results)
+        if results: await handle_collected_js_files(get_storage(), event, results)
 
 
 @rcn_event()
@@ -95,7 +95,7 @@ async def store_app_flows(event, scheduled_md):
             site = urlparse(url).netloc
             found_sites_data[site].append(flow)
 
-        st = storage()
+        st = get_storage()
         for site, site_flows in found_sites_data.items():
             app = get_app_by_site(st, site)
             if not app: continue
@@ -144,7 +144,7 @@ async def store_js_flows(event, scheduled_md):
                 site = urlparse(flow["url"]).netloc
                 found_sites_data[site].append(flow)
 
-        st = storage()
+        st = get_storage()
         for site, site_flows in found_sites_data.items():
             app = get_app_by_site(st, site)
             if not app: continue

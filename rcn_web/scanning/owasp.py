@@ -8,7 +8,7 @@ from itertools import groupby
 from contextlib import asynccontextmanager
 from functools import partial
 
-from rcn_web.core.utils import storage
+from rcn_web.core.utils import get_storage
 from rcn_web.core.utils import web_match_storage
 from pentest_utils.ai import ai_ask
 from .utils import get_unprocessed_entries

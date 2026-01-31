@@ -19,7 +19,7 @@ from mitmproxy.http import Headers
 
 import rcn_core.globals
 
-from rcn_web.core.utils import storage, get_app_by_site, get_app_by_id, add_apps
+from rcn_web.core.utils import get_storage, get_app_by_site, get_app_by_id, add_apps
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
 from pentest_utils.utils import id_hash
@@ -174,7 +174,7 @@ def app_links_id_fn(entry):
 
 async def handle_collected_urls(extractor, content):
     data = content["data"]
-    st = storage()
+    st = get_storage()
     found_sites_data = defaultdict(list)
     for u in data:
         site = urlparse(u["url"]).netloc
@@ -263,7 +263,7 @@ async def add_gau_entries(all_entries):
             p = urlparse(link)
             found_sites[p.netloc].append([None, None, link])
 
-        st = storage()
+        st = get_storage()
 
         for site in found_sites:
             app = get_app_by_site(st, site)
@@ -280,7 +280,7 @@ async def add_gau_entries(all_entries):
 
 
 def get_links_fn(links: list):
-    s = storage()
+    s = get_storage()
     new_obj = list()
     for link_obj in links:
         n = dict(link_obj)

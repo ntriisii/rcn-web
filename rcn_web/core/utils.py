@@ -380,9 +380,9 @@ class RemoteFlowsAdapter(StorageMetaData):
 def web_match_storage(match_str, target=None):
     if match_str == "flows":
         st = RemoteFlowsAdapter.get_instance()
-        return [{"storage": st, "parent": storage()}]
+        return [{"storage": st, "parent": get_storage()}]
     
-    current_storage = target if target else storage()
+    current_storage = target if target else get_storage()
     if hasattr(current_storage, "targets") and target is None:
         found_storages = []
         for t in current_storage.targets.values():

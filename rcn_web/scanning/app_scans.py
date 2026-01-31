@@ -7,7 +7,7 @@ from itertools import groupby
 from contextlib import asynccontextmanager
 from functools import partial
 
-from rcn_web.core.utils import storage
+from rcn_web.core.utils import get_storage
 from rcn_web.core.utils import web_match_storage
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
 from pentest_utils.ai import ai_ask

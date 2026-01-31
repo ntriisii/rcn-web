@@ -42,6 +42,6 @@ def get_ip_censys_data(ip: str):
 
 @router.get("/clearShodanIPs")
 def clear_shodan_ips():
-    ip_storage = storage().get_storage_create("shodan-scrapped-ips")
+    ip_storage = get_storage().get_storage_create("shodan-scrapped-ips")
     ip_storage.clear()
     ip_storage.storage_md_set("shodan-last-scanned-index", 0)

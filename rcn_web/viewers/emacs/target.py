@@ -56,7 +56,7 @@ def get_cached_todos_status(app):
 
 
 def elisp_view_app_annotations(app_id):
-    app = get_app_by_site(storage(), app_id)
+    app = get_app_by_site(get_storage(), app_id)
     if not app: return {}
     app_name = app['site']
     
@@ -101,7 +101,7 @@ def elisp_view_app_annotations(app_id):
 
 
 def elisp_view_app_todos(app_id):
-    app = get_app_by_site(storage(), app_id)
+    app = get_app_by_site(get_storage(), app_id)
     
     if not app: return {}
     app_name = app['site']
@@ -283,14 +283,14 @@ def elisp_make_target_view_data():
     github = arrange_github_dorks_views()
     shodan = arrange_shodan_dorks_views()
 
-    st = storage()
+    st = get_storage()
     org_entries = {
         "Apps count": len(get_uniq_apps(s)),
         "IPs count": st.get_storage_create("found-ips").length,
     }
 
-    for ds in storage().data_storages_names:
-        s = storage()[ds]
+    for ds in get_storage().data_storages_names:
+        s = get_storage()[ds]
         # TODO: change here
         if not hasattr(s, "_storage_metadata"):
             s._storage_metadata = dict()
@@ -324,12 +324,12 @@ def elisp_make_target_view_data():
                             *[
                                 elisp_make_org_headline(
                                     name=" ".join(
-                                        i for i in storage()[ds].storage_name.split("-")
+                                        i for i in get_storage()[ds].storage_name.split("-")
                                     ),
-                                    entries=storage()[ds].get_data_preview(),
+                                    entries=get_storage()[ds].get_data_preview(),
                                     push_btn="rcn-view--basic-push-btn",
                                 )
-                                for ds in storage().data_storages_names
+                                for ds in get_storage().data_storages_names
                             ],
                         ],
                     },
