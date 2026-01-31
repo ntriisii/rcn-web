@@ -41,7 +41,7 @@ from rcn_web.viewers.emacs.utils import make_basic_dict_entry_view
 
 from rcn_web.core.scope import get_inscope_domains
 from rcn_web.core.scope import get_target_scope
-from rcn_web.core.utils import web_match_storage
+from rcn_web.core.utils import web_match_storage, get_storage, get_uniq_apps, get_app_by_site, get_app_by_id
 
 # --- Register functions for YAML context ---
 import rcn_web.core.events
@@ -129,7 +129,7 @@ def getsize(obj_0):
 
 @app.get("/getApp")
 async def get_app_data(app_id):
-    app = get_app_by_site(get_storage(), app_id)
+    app = get_app_by_id(get_storage(), app_id)
     if not app: return JSONResponse({"error": "app not found"}, status_code=404)
 
     data = elisp_make_app_view_data(app)
@@ -144,7 +144,7 @@ async def get_app_more_data(req: Request):
     include_all_data = data["include-all-data"]
     found_apps = []
     for i in ids:
-        app = get_app_by_site(get_storage(), i)
+        app = get_app_by_id(get_storage(), i)
         if not app:
             continue
         if not include_all_data:
@@ -296,8 +296,8 @@ async def get_app(content: Request):
 
     elif app_id or app_name:
         app = None
-        if app_id: app = get_app_by_site(get_storage(), app_id)
-        if not app and app_name: app = get_app_by_site(get_storage(), app_name)
+        if app_id: app = get_app_by_id(get_storage(), app_id)
+        if not app and app_name: app = get_app_by_id(get_storage(), app_name)
         
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
@@ -334,7 +334,7 @@ async def get_data_view(entry, data_storage="app"):
     data = dict()
 
     if data_storage == "app":
-        app = get_app_by_site(get_storage(), entry)
+        app = get_app_by_id(get_storage(), entry)
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
         data = elisp_make_app_view_data(app)
