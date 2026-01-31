@@ -253,11 +253,8 @@ async def get_app(content: Request):
             limit=limit,
         )
     
-    elif storage_name == "App-Annotations":
-        data = elisp_view_app_annotations(app_id)
-    
-    elif storage_name == "App-TODOs":
-        data = elisp_view_app_todos(app_id)
+    elif storage_name == "App-Annotations": data = elisp_view_app_annotations(app_id)
+    elif storage_name == "App-TODOs": data = elisp_view_app_todos(app_id)
     
     # elif storage_name == "app-flows":
     #     app = get_app_by_site(get_storage(), app_id)
@@ -274,14 +271,14 @@ async def get_app(content: Request):
     #         refresh=refresh,
     #         limit=limit,
     #     )
-
+    
     elif storage_name == "ip":
         # internetdb_content = get_storage().get_storage_create('shodan-internetdb-ips').get()
         # if not internetdb_content:
         #   ips = [i['ip'] for i in get_storage().get_storage_create('found-ips').get()]
         #   d = await shodan_internetdb_port_scan(ips)
         #   get_storage().get_storage_create('shodan-internetdb-ips').add_many(d, source=)
-
+        
         data = view_ip_data(
             get_storage(),
             match_groups=match_groups,
@@ -293,15 +290,14 @@ async def get_app(content: Request):
             id_name="id",
             limit=limit,
         )
-
+    
     elif app_id or app_name:
         app = None
         if app_id: app = get_app_by_id(get_storage(), app_id)
         if not app and app_name: app = get_app_by_id(get_storage(), app_name)
         
-        if not app:
-            return JSONResponse({"error": "app not found"}, status_code=404)
-        st = get_storage_create("web-apps::" + storage_name, parent_id=app['id'])
+        if not app: return JSONResponse({"error": "app not found"}, status_code=404)
+        st = get_storage_create(storage_name if "::" in storage_name else "web-apps::" + storage_name, parent_id=app['id'])
         if not st:
             return JSONResponse(
                 {"error": "storage cannot be found in app"}, status_code=404
@@ -317,11 +313,10 @@ async def get_app(content: Request):
             id_name="id",
             limit=limit,
         )
-
+    
     elif not app_name and not app_id and storage_name:
         st = get_storage_create(storage_name)
-        if not st:
-            return JSONResponse({"error": "app not found"}, status_code=404)
+        if not st: return JSONResponse({"error": "app not found"}, status_code=404)
 
         data = elisp_make_basic_storage_view(st)
         
@@ -364,9 +359,7 @@ async def analyze(req: Request):
 
 
 @app.get("/getAppStorageEntryById")
-async def get_entry_by_id(
-    entry_id: int, storage_name: str, app_name: "Optional[str]" = None
-):
+async def get_entry_by_id(entry_id: int, storage_name: str, app_name: "Optional[str]" = None):
 
     if not app_name:
         st = get_storage()[storage_name]
@@ -382,7 +375,7 @@ async def get_entry_by_id(
     app = get_app_by_site(get_storage(), app_name)
     if not app:
         return JSONResponse("app not found", status_code=404)
-    st = get_storage_create("web-apps::" + storage_name, parent_id=app['id'])
+    st = get_storage_create(storage_name if "::" in storage_name else "web-apps::" + storage_name, parent_id=app['id'])
 
     if not st:
         return JSONResponse("storage not found", status_code=404)
@@ -445,7 +438,7 @@ async def get_all_annotations():
         common_app_storages = ["app-links", "js-links", "fuzzing-data", "nuclei-scanning", "js-secrets", "trufflehog-secrets"]
         for st_name in common_app_storages:
             try:
-                st = get_storage_create("web-apps::" + st_name, parent_id=app['id'])
+                st = get_storage_create(st_name if "::" in st_name else "web-apps::" + st_name, parent_id=app['id'])
                 annotations = st.get_annotations()
                 for annotation in annotations:
                     annotation['app_site'] = app['site']
