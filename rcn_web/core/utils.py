@@ -25,7 +25,9 @@ from rcn_core.log import rlog
 from rcn_core.storage.target_storage import TargetStorage
 from rcn_core.storage.bases import StorageMetaData, get_storage_create, add_annotation
 from rcn_core.data_access import (
-    storage, get_unprocessed_entries, match_storage,
+    get_storage, get_unprocessed_entries, match_storage,
+_UNIQ_APPS_CACHE = {}
+_UNIQ_APPS_CACHE_TTL = 30
     get_multi_unprocessed_entries, get_unprocessed_annotations,
     process_new_entries_for_events, rr_server_running, can_run_bulk_commands,
     reset_scanning_data
@@ -41,14 +43,14 @@ def get_scope_identities():
     targets = config.get("targets")
     if not targets:
         config = rcn_core.globals.YAML_FILE_CONTENT
-        targets = config.get("targets", {{}})
+        targets = config.get("targets", dict())
 
     identities = []
     
     if targets:
         for target_name, target_info in targets.items():
             if not isinstance(target_info, dict): continue
-            t_scope = target_info.get("scope", {{}})
+            t_scope = target_info.get("scope", {})
             if isinstance(t_scope, dict):
                 identities.extend(t_scope.get("wildcards", []))
                 t_urls = t_scope.get("urls", [])
@@ -145,11 +147,22 @@ def get_apps(target_storage_obj):
         for t in target_storage_obj.targets.values():
             all_apps.extend(get_apps(t))
         return all_apps
-    return target_storage_obj.get_storage_create("web-apps").get()
+    
+    apps = target_storage_obj.get_storage_create("web-apps")
+    return apps.get()
 
 def get_uniq_apps(target_storage_obj) -> "list[dict]":
     # Late import to avoid circular dependency
     from rcn_web.core.scope import get_inscope_domains
+    
+    global _UNIQ_APPS_CACHE
+    ts_id = id(target_storage_obj)
+    current_time = time.time()
+    
+    if ts_id in _UNIQ_APPS_CACHE:
+        cache_entry = _UNIQ_APPS_CACHE[ts_id]
+        if current_time - cache_entry["timestamp"] < _UNIQ_APPS_CACHE_TTL:
+            return cache_entry["data"]
     
     all_apps = get_apps(target_storage_obj)
     if not all_apps: return []
@@ -179,8 +192,10 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     in_scope_sites = [site for site in scope_data.keys() if is_in_scope(site)]
     
     found_apps = [scope_data[site] for site in in_scope_sites if site in scope_data]
-    return sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
-
+    found_apps = sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
+    
+    _UNIQ_APPS_CACHE[ts_id] = {"timestamp": current_time, "data": found_apps}
+    return found_apps
 def get_target_for_site(target_storage_obj, site):
     # Late import
     from rcn_web.core.scope import check_domain_in_scope
