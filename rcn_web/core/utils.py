@@ -26,77 +26,18 @@ from rcn_core.storage.target_storage import TargetStorage
 from rcn_core.storage.bases import StorageMetaData, get_storage_create, add_annotation
 from rcn_core.data_access import (
     get_storage, get_unprocessed_entries, match_storage,
-_UNIQ_APPS_CACHE = {}
-_UNIQ_APPS_CACHE_TTL = 30
     get_multi_unprocessed_entries, get_unprocessed_annotations,
     process_new_entries_for_events, rr_server_running, can_run_bulk_commands,
     reset_scanning_data
 )
 
+_UNIQ_APPS_CACHE = {}
+_UNIQ_APPS_CACHE_TTL = 30
 # --- Scope Utilities (Moved from Core) ---
 
-def get_scope_identities():
-    """
-    Retrieves a generic list of scope identities from the configuration.
-    """
-    config = rcn_core.globals.TARGET_CONFIG
-    targets = config.get("targets")
-    if not targets:
-        config = rcn_core.globals.YAML_FILE_CONTENT
-        targets = config.get("targets", dict())
-
-    identities = []
-    
-    if targets:
-        for target_name, target_info in targets.items():
-            if not isinstance(target_info, dict): continue
-            t_scope = target_info.get("scope", {})
-            if isinstance(t_scope, dict):
-                identities.extend(t_scope.get("wildcards", []))
-                t_urls = t_scope.get("urls", [])
-                if isinstance(t_urls, list):
-                    identities.extend(t_urls)
-                elif isinstance(t_urls, str):
-                    identities.append(t_urls)
-    
-    return identities
 def is_in_scope(asset_identifier: str):
-    """
-    Checks if an asset identifier is in the current scope.
-    Supports wildcard matching (e.g., *.example.com) for any type of asset.
-    """
-    if not asset_identifier: return False
-    
-    scope_identities = get_scope_identities()
-    
-    for scope_id in scope_identities:
-        # 1. Exact match
-        if asset_identifier == scope_id: return True
-        
-        # 2. Wildcard match (glob)
-        # Normalize wildcards: *.example.com -> .example.com for simpler suffix checking if needed,
-        # but fnmatch handles * correctly.
-        if "*" in scope_id:
-            if fnmatch.fnmatch(asset_identifier, scope_id):
-                return True
-            # Also handle the implicit "subdomain" case if it starts with *.
-            # e.g. scope: *.example.com, asset: sub.example.com -> match
-            # asset: example.com -> match? (Usually yes in recon tools)
-            if scope_id.startswith("*."):
-                suffix = scope_id[1:] # .example.com
-                if asset_identifier.endswith(suffix) or asset_identifier == scope_id[2:]:
-                    return True
-        
-        # 3. Domain suffix match fallback (legacy behavior often implies subdomains are in scope)
-        # If scope is 'example.com', usually 'sub.example.com' is in scope.
-        # But for generic assets (e.g. 'John Doe'), suffix match is bad.
-        # So we restrict implicit suffix match to likely domains (contains dot).
-        if "." in scope_id and not " " in scope_id:
-            if asset_identifier.endswith("." + scope_id) or asset_identifier == scope_id:
-                return True
-    
-    return False
-
+    from rcn_web.core.scope import get_target_scope, check_domain_in_scope
+    return check_domain_in_scope(asset_identifier, get_target_scope())
 # --- Web App Utilities ---
 
 def get_app_by_site(target_storage_obj, app_site: str):
@@ -159,13 +100,14 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     ts_id = id(target_storage_obj)
     current_time = time.time()
     
-    if ts_id in _UNIQ_APPS_CACHE:
-        cache_entry = _UNIQ_APPS_CACHE[ts_id]
-        if current_time - cache_entry["timestamp"] < _UNIQ_APPS_CACHE_TTL:
-            return cache_entry["data"]
+    # if ts_id in _UNIQ_APPS_CACHE:
+    #     cache_entry = _UNIQ_APPS_CACHE[ts_id]
+    #     if current_time - cache_entry["timestamp"] < _UNIQ_APPS_CACHE_TTL:
+    #         return cache_entry["data"]
     
     all_apps = get_apps(target_storage_obj)
     if not all_apps: return []
+    print("the freaking apps length is", len(all_apps))
     
     found_hashes = []
     scope_data = dict()
@@ -194,8 +136,9 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     found_apps = [scope_data[site] for site in in_scope_sites if site in scope_data]
     found_apps = sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
     
-    _UNIQ_APPS_CACHE[ts_id] = {"timestamp": current_time, "data": found_apps}
+    # _UNIQ_APPS_CACHE[ts_id] = {"timestamp": current_time, "data": found_apps}
     return found_apps
+
 def get_target_for_site(target_storage_obj, site):
     # Late import
     from rcn_web.core.scope import check_domain_in_scope
