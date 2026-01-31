@@ -1,4 +1,5 @@
 
+import re
 import asyncio
 import os
 import sys
@@ -35,55 +36,28 @@ from rcn_core.data_access import (
 def get_scope_identities():
     """
     Retrieves a generic list of scope identities from the configuration.
-    Supports both legacy 'scope' (list of dicts) and new 'engagement-scope' (assets/targets).
     """
     config = rcn_core.globals.TARGET_CONFIG
-    if not config.get("engagement-scope"):
+    targets = config.get("targets")
+    if not targets:
         config = rcn_core.globals.YAML_FILE_CONTENT
+        targets = config.get("targets", {{}})
 
     identities = []
     
-    # 1. New 'engagement-scope' structure
-    if config.get("engagement-scope"):
-        scope_data = config["engagement-scope"]
-        if isinstance(scope_data, dict):
-            # Raw targets_data structure
-            if "targets_data" in scope_data:
-                targets_data = scope_data["targets_data"]
-                for target_name, target_info in targets_data.items():
-                    if not isinstance(target_info, dict): continue
-                    t_scope = target_info.get("scope", {})
-                    if isinstance(t_scope, dict):
-                        identities.extend(t_scope.get("wildcards", []))
-                        t_urls = t_scope.get("urls", [])
-                        if isinstance(t_urls, list):
-                            identities.extend(t_urls)
-                        elif isinstance(t_urls, str):
-                            identities.append(t_urls)
-
-            # Collect from both 'assets' and 'targets'
-            for category in ["assets", "targets"]:
-                items = scope_data.get(category, [])
-                for item in items:
-                    val = item.get("value")
-                    if val: identities.append(val)
-    
-    # 2. Legacy 'scope' structure
-    scope = config.get("scope")
-    if scope:
-        if isinstance(scope, list):
-            for item in scope:
-                val = item.get("asset_identifier")
-                if val: identities.append(val)
-        elif isinstance(scope, dict):
-            # Multitarget legacy
-            for target_scope in scope.values():
-                for item in target_scope:
-                    val = item.get("asset_identifier")
-                    if val: identities.append(val)
+    if targets:
+        for target_name, target_info in targets.items():
+            if not isinstance(target_info, dict): continue
+            t_scope = target_info.get("scope", {{}})
+            if isinstance(t_scope, dict):
+                identities.extend(t_scope.get("wildcards", []))
+                t_urls = t_scope.get("urls", [])
+                if isinstance(t_urls, list):
+                    identities.extend(t_urls)
+                elif isinstance(t_urls, str):
+                    identities.append(t_urls)
     
     return identities
-
 def is_in_scope(asset_identifier: str):
     """
     Checks if an asset identifier is in the current scope.
@@ -210,22 +184,42 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
 def get_target_for_site(target_storage_obj, site):
     # Late import
     from rcn_web.core.scope import check_domain_in_scope
+    import re
     
     if not hasattr(target_storage_obj, "targets"): return target_storage_obj
     
     for target in target_storage_obj.targets.values():
         scope = target.config.get("scope")
         if not scope: continue
-        wildcard_pattern = r"\*\.?[A-Za-z-0-9]+(.[A-Za-z-0-9]+){1,}"
-        wildcards = [i["asset_identifier"] for i in scope if i["asset_type"] == "WILDCARD" or re.match(wildcard_pattern, i["asset_identifier"])]
-        wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
-        urls = [i["asset_identifier"] for i in scope if i["asset_type"] == "URL"]
+        
+        wildcards = []
+        urls = []
+        
+        if isinstance(scope, dict):
+            # New format
+            wildcards = scope.get("wildcards", [])
+            urls = scope.get("urls", [])
+            
+            # Sanitize wildcards for check_domain_in_scope (it expects simple strings or domains)
+            # Original code did: [i.replace("*.", ".").replace("*", "") for i in wildcards]
+            wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
+            
+        elif isinstance(scope, list):
+            # Legacy format support
+            wildcard_pattern = r"\*\.?([A-Za-z0-9]+(.[A-Za-z0-9]+){1,})"
+            for i in scope:
+                aid = i.get("asset_identifier")
+                atype = i.get("asset_type")
+                if atype == "WILDCARD" or (aid and re.match(wildcard_pattern, aid)):
+                    wildcards.append(aid.replace("*.", ".").replace("*", ""))
+                elif atype == "URL":
+                    urls.append(aid)
+
         check_scope = {"wildcards": wildcards, "urls": urls}
         if check_domain_in_scope(site, check_scope): return target
         
     if target_storage_obj.targets: return list(target_storage_obj.targets.values())[0]
     return None
-
 def add_apps(target_storage_obj, apps: "list[dict]"):
     if not apps: return []
     if not target_storage_obj: return []
@@ -237,6 +231,7 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
             if not domain:
                 url = app_data.get("url") or app_data.get("final_url") or app_data.get("location")
                 if url: domain = urlparse(url).hostname
+                
             if domain:
                 target = get_target_for_site(target_storage_obj, domain)
                 if target:
@@ -442,6 +437,7 @@ def web_match_storage(match_str, target=None):
     # Fallback to core
     return match_storage(match_str, target)
 
+
 async def mcp_server_user_interaction(prompt:str, msg_type:str = "ai-todo") -> dict:
     from pentest_utils.web.websockets import WSConnectionManager
     try:
@@ -467,4 +463,3 @@ def uniq_apps(data):
             uniq_apps.append(app)
             curls.append(u)
     return uniq_apps
-
