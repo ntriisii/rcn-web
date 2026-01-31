@@ -184,36 +184,18 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
 def get_target_for_site(target_storage_obj, site):
     # Late import
     from rcn_web.core.scope import check_domain_in_scope
-    import re
     
     if not hasattr(target_storage_obj, "targets"): return target_storage_obj
     
     for target in target_storage_obj.targets.values():
         scope = target.config.get("scope")
-        if not scope: continue
+        if not scope or not isinstance(scope, dict): continue
         
-        wildcards = []
-        urls = []
+        wildcards = scope.get("wildcards", [])
+        urls = scope.get("urls", [])
         
-        if isinstance(scope, dict):
-            # New format
-            wildcards = scope.get("wildcards", [])
-            urls = scope.get("urls", [])
-            
-            # Sanitize wildcards for check_domain_in_scope (it expects simple strings or domains)
-            # Original code did: [i.replace("*.", ".").replace("*", "") for i in wildcards]
-            wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
-            
-        elif isinstance(scope, list):
-            # Legacy format support
-            wildcard_pattern = r"\*\.?([A-Za-z0-9]+(.[A-Za-z0-9]+){1,})"
-            for i in scope:
-                aid = i.get("asset_identifier")
-                atype = i.get("asset_type")
-                if atype == "WILDCARD" or (aid and re.match(wildcard_pattern, aid)):
-                    wildcards.append(aid.replace("*.", ".").replace("*", ""))
-                elif atype == "URL":
-                    urls.append(aid)
+        # Sanitize wildcards for check_domain_in_scope
+        wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
 
         check_scope = {"wildcards": wildcards, "urls": urls}
         if check_domain_in_scope(site, check_scope): return target

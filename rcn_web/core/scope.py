@@ -35,33 +35,7 @@ def get_config_wildcards(config: dict):
                 
     if wildcards:
         return [i.replace("*.", "").replace("*", "") for i in wildcards]
-
-    # Fallback to old structure
-    scope = config.get("scope", [])
-    if not scope: return []
-    wildcard_pattern = re.compile(r"\*\.?[A-Za-z-0-9]+(.[A-Za-z-0-9]+){1,}")
-    
-    is_multitarget = config.get("multitarget", False)
-    all_wildcards = []
-    if is_multitarget and isinstance(scope, dict):
-        for target_name, target_scope in scope.items():
-            target_wildcards = [
-                i["asset_identifier"]
-                for i in target_scope
-                if i["asset_type"] == "WILDCARD"
-                or re.match(wildcard_pattern, i["asset_identifier"])
-            ]
-            all_wildcards.extend(target_wildcards)
-    elif isinstance(scope, list):
-        all_wildcards = [
-            i["asset_identifier"]
-            for i in scope
-            if i["asset_type"] == "WILDCARD"
-            or re.match(wildcard_pattern, i["asset_identifier"])
-        ]
-    wild_cards = [i.replace("*.", "").replace("*", "") for i in all_wildcards]
-    return wild_cards
-
+    return []
 def get_config_urls(config: dict):
     urls = []
     
@@ -87,11 +61,7 @@ def get_config_urls(config: dict):
                         urls.extend(t_urls)
                     elif isinstance(t_urls, str):
                         urls.append(t_urls)
-    if urls:
-        return urls
-
-    # Fallback to old structure
-
+    return urls
 def get_target_scope():
     scope = dict()
     scopewc = get_scope_wildcards([])
