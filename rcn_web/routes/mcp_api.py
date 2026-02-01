@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Query
 from fastapi.responses import PlainTextResponse, JSONResponse
 from typing import Optional
 
-from rcn_web.storage.utils import storage
+from rcn_web.storage.utils import get_storage
 from rcn_core.storage.target_storage import TargetStorage
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.parse_yaml import execute_script
@@ -133,7 +133,7 @@ async def check_scan_results(request: ScanResultsRequest):
         keys = list(results[0].keys())
         
         # Filter out internal keys if desired, similar to get_text_view
-        internal_keys = ['application_id', 'source_id']
+        internal_keys = ['source_id']
         keys = [k for k in keys if k not in internal_keys]
         
         text_output.append("each line of entry in this storage consists of:")

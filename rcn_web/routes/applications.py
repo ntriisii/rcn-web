@@ -232,7 +232,7 @@ async def preview_apps(request: AppPreviewRequest):
         ai_payload += f"APP ID: {app['id']}\n"
         # Manual text view since Entry is removed
         for k, v in app.items():
-            if k not in ["id", "timestamp", "application_id", "parent_id"]:
+            if k not in ["id", "timestamp", "parent_id"]:
                 ai_payload += f"{k}: {v}\n"
         
         ai_payload += "\n\nApplication Annotations:\n"
