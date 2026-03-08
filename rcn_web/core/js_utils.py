@@ -41,14 +41,18 @@ async def deobfuscate_js(js_content: str, url: str):
     async with aiof.open(js_file, "w") as f:
         await f.write(js_content)
 
-    # Run webcrack
-    # npx webcrack input.js -o unpacked
+    # Use installed webcrack if available, otherwise fallback to npx
+    webcrack_path = os.path.expanduser("~/.npm-global/bin/webcrack")
     unpacked_dir = os.path.join(tmp_dir, "unpacked")
-    # Use full path to npx
-    npx_path = "/home/ahmed/.nix-profile/bin/npx"
-    rc, stdout, stderr = await run_command(
-        [npx_path, "-y", "webcrack", js_file, "-o", unpacked_dir]
-    )
+
+    if os.path.exists(webcrack_path):
+        cmd = [webcrack_path, js_file, "-o", unpacked_dir]
+    else:
+        # Fallback to npx -y
+        npx_path = "/home/ahmed/.nix-profile/bin/npx"
+        cmd = [npx_path, "-y", "webcrack", js_file, "-o", unpacked_dir]
+
+    rc, stdout, stderr = await run_command(cmd)
 
     if rc != 0:
         rlog(f"webcrack failed for {url}: {stderr}", level="error")
@@ -62,11 +66,13 @@ async def run_semgrep(target_path: str):
     """
     Runs semgrep on the target path with javascript security rules.
     """
-    # Use uvx for semgrep
-    uvx_path = "/home/ahmed/.local/bin/uvx"
-    rc, stdout, stderr = await run_command(
-        [
-            uvx_path,
+    # Use installed semgrep
+    semgrep_path = os.path.expanduser("~/.local/bin/semgrep")
+    if not os.path.exists(semgrep_path):
+        # Fallback to uvx
+        semgrep_path = "/home/ahmed/.local/bin/uvx"
+        cmd = [
+            semgrep_path,
             "semgrep",
             "--config",
             "p/javascript",
@@ -75,7 +81,18 @@ async def run_semgrep(target_path: str):
             "--json",
             target_path,
         ]
-    )
+    else:
+        cmd = [
+            semgrep_path,
+            "--config",
+            "p/javascript",
+            "--config",
+            "p/owasp-top-10",
+            "--json",
+            target_path,
+        ]
+
+    rc, stdout, stderr = await run_command(cmd)
     if rc == 0:
         try:
             return json.loads(stdout).get("results", [])
@@ -90,7 +107,9 @@ async def run_jsluice(js_file_path: str):
     """
     findings = []
     # Use full path to jsluice
-    jsluice_path = "/home/ahmed/.local/bin/jsluice"
+    jsluice_path = os.path.expanduser("~/go/bin/jsluice")
+    if not os.path.exists(jsluice_path):
+        jsluice_path = "/home/ahmed/.local/bin/jsluice"
 
     if not os.path.exists(jsluice_path):
         return []
@@ -121,7 +140,7 @@ async def run_ppmap(url: str):
     Runs ppmap on a URL to check for prototype pollution.
     """
     # ppmap expects input via stdin
-    ppmap_path = "/home/ahmed/go/bin/ppmap"
+    ppmap_path = os.path.expanduser("~/go/bin/ppmap")
     if not os.path.exists(ppmap_path):
         return ""
     rc, stdout, stderr = await run_command([ppmap_path], input_data=url)
