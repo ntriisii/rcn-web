@@ -210,9 +210,10 @@ Source Code Samples (Recovered):
 **Your Task**: 
 1. Analyze the code for logic flaws, authentication bypasses, or sensitive data leaks.
 2. YOU MUST ACT AS A FUNCTION. Return Python code that I can execute to record your findings.
-3. Use `add_annotation(category='js-analysis', key='finding', value='...')` for vulnerabilities.
-4. Use `add_annotation(category='js-analysis', key='notify', value='...')` for interesting endpoints.
-5. If you see a clear exploitation path, call `delegate_to_acp(agent_name='exploit_agent', instructions='...')`.
+3. Upon finishing your analysis and testing, you must record your findings by calling the provided functions.
+4. Use `add_annotation(category='js-analysis', key='finding', value='...')` for vulnerabilities.
+5. Use `add_annotation(category='js-analysis', key='notify', value='...')` for interesting endpoints or attack surface.
+6. If you see a clear exploitation path, call `delegate_to_acp(agent_name='exploit_agent', instructions='...')`.
 
 Return ONLY the Python code inside a code block.
 """
