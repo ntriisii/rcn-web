@@ -38,10 +38,12 @@ _UNIQ_APPS_CACHE_TTL = 30
 def is_in_scope(asset_identifier: str):
     from rcn_web.core.scope import get_target_scope, check_domain_in_scope
     return check_domain_in_scope(asset_identifier, get_target_scope())
+
 # --- Web App Utilities ---
 
 def get_app_by_site(target_storage_obj, app_site: str):
     if not target_storage_obj: return None
+    print(f"getting app by site for {app_site}")
     
     if hasattr(target_storage_obj, "targets"):
         for t in target_storage_obj.targets.values():
@@ -54,8 +56,8 @@ def get_app_by_site(target_storage_obj, app_site: str):
     if st.storage_name not in st._schema_cache: return None
     
     with st.get_connection() as conn:
-        query = f"SELECT * FROM {st.table_name} WHERE parent_id = ? AND (site = ? OR site LIKE ?)"
-        cursor = conn.execute(query, (target_storage_obj.id, app_site, f"{app_site}:%"))
+        query = f"SELECT * FROM {st.table_name} WHERE (site = ? OR site LIKE ?)"
+        cursor = conn.execute(query, (app_site, f"{app_site}:%", ))
         row = cursor.fetchone()
         if row: return dict(row)
         
@@ -71,14 +73,14 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
         return None
 
     st = target_storage_obj.get_storage_create("web-apps")
-    
     if st.storage_name not in st._schema_cache: return None
     
     with st.get_connection() as conn:
-        cursor = conn.execute(f"SELECT * FROM {st.table_name} WHERE parent_id = ? AND id = ?", (target_storage_obj.id, app_id))
+        cursor = conn.execute(f"SELECT * FROM {st.table_name} WHERE id = ?", (int(app_id),))
         row = cursor.fetchone()
-        if row: return dict(row)
         
+        if row: return dict(row)
+    
     return None
 
 def get_apps(target_storage_obj):
@@ -107,12 +109,11 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     
     all_apps = get_apps(target_storage_obj)
     if not all_apps: return []
-    print("the freaking apps length is", len(all_apps))
+    # print("the freaking apps length is", len(all_apps))
     
     found_hashes = []
     scope_data = dict()
     storage_mapping = ["app-links", "fuzzing-data", "nuclei-scanning", "trufflehog-secrets", "js-links", "js-secrets"]
-    
     for app in all_apps:
         chash_str = str(app.get("content_length", "")) + str(app.get("port", "")) + str(app.get("host", "")) + str(app.get("status_code", "")) + str(app.get("title", ""))
         chash = int.from_bytes(hashlib.md5(chash_str.encode("utf-8")).digest(), "little")
@@ -160,6 +161,7 @@ def get_target_for_site(target_storage_obj, site):
         
     if target_storage_obj.targets: return list(target_storage_obj.targets.values())[0]
     return None
+
 def add_apps(target_storage_obj, apps: "list[dict]"):
     if not apps: return []
     if not target_storage_obj: return []
@@ -207,10 +209,9 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
         if isinstance(tech, list): app_data["technologies"] = ",".join(tech)
         if app_data.get("input"): app_data["input_domain"] = app_data.get("input")
         
-        required_keys = ["title", "method", "tech", "status_code", "technologies", "input_domain", "port", "site", "host", "url"]
+        required_keys = ["title", "method", "tech", "status_code", "technologies", "input_domain", "port", "site", "host", "url", "scheme"]
         app_data = {i:app_data.get(i) for i in required_keys}
         
-        app_data["id"] = xxhash.xxh32(site, seed=0).intdigest()
         processed_apps.append(app_data)
     
     st = target_storage_obj.get_storage_create("web-apps")
@@ -242,12 +243,14 @@ class RemoteFlowsAdapter(StorageMetaData):
     def get_instance(cls):
         if cls._instance is None: cls._instance = cls()
         return cls._instance
+    
     def __init__(self):
         StorageMetaData.__init__(self)
         self._cache = []
         self._last_fetch_ts = time.time()
         self._fetch_lock = asyncio.Lock()
         self._max_cache_size = 10000
+        
     def _convert_headers(self, headers):
         m = MultiDict()
         if isinstance(headers, dict):
@@ -256,10 +259,12 @@ class RemoteFlowsAdapter(StorageMetaData):
             for h in headers:
                 if len(h) > 1: m.add(h[0], h[1:])
         return m
+    
     def _process_flow_headers(self, flow):
         if "request-headers" in flow: flow["request-headers"] = self._convert_headers(flow["request-headers"])
         if "response-headers" in flow: flow["response-headers"] = self._convert_headers(flow["response-headers"])
         return flow
+    
     def _storage_md_get_data_storage(self, requester="", count=1000):
         last_ts = self.storage_md_get(requester + "-last-id-timestamp") or 0.0
         data = [f for f in self._cache if float(f.get("timestamp", 0)) > float(last_ts)]
@@ -346,7 +351,7 @@ def web_match_storage(match_str, target=None):
         for t in current_storage.targets.values():
             found_storages.extend(web_match_storage(match_str, target=t))
         return found_storages
-
+    
     parts = match_str.split("::")
     is_annotations = parts[-1] == "annotations"
     if is_annotations:
