@@ -1439,7 +1439,7 @@ wheels = [
 [[package]]
 name = "pentest-utils"
 version = "0.1.0"
-source = { directory = "../pentest-utils" }
+source = { editable = "../pentest-utils" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
@@ -1944,13 +1944,14 @@ wheels = [
 [[package]]
 name = "rcn-core"
 version = "0.1.0"
-source = { directory = "../rcn-core" }
+source = { editable = "../rcn-core" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "fastapi" },
     { name = "fastapi-utils" },
     { name = "fastmcp" },
+    { name = "pentest-utils" },
     { name = "ruamel-yaml" },
     { name = "typing-inspect" },
     { name = "uvicorn" },
@@ -1964,6 +1965,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "fastapi-utils" },
     { name = "fastmcp" },
+    { name = "pentest-utils", editable = "../pentest-utils" },
     { name = "ruamel-yaml" },
     { name = "typing-inspect" },
     { name = "uvicorn" },
@@ -1992,7 +1994,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "mitmproxy", specifier = ">=10.4.0" },
     { name = "pentest-utils", directory = "../pentest-utils" },
-    { name = "rcn-core", directory = "../rcn-core" },
+    { name = "rcn-core", editable = "../rcn-core" },
     { name = "uvicorn" },
     { name = "watchdog" },
 ]

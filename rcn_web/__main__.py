@@ -21,15 +21,16 @@ def init_config():
     import rcn_web.rcn_exports
     exports_pkg = rcn_web.rcn_exports
     
-    try: load_files(exports=exports_pkg)
+    try: load_files(exports=exports_pkg, base_config_path="~/.config/rcn-web/server-config.yaml")
     except yml_err.YAMLError as error: rlog(f"there was an error while loading the yaml files {error}", level="error")
-
-if __name__ == "__main__": init_config()
 
 # Import app after config loading
 from .main import app
 
 if __name__ == "__main__":
+    
+    init_config()
+    
     server_yaml_config = rcn_core.globals.YAML_FILE_CONTENT
     
     host_default = "localhost"
@@ -40,7 +41,7 @@ if __name__ == "__main__":
         log_level_default = server_yaml_config.get("server-config", {}).get("fastapi-log-level", "info")
     except:
         log_level_default = "info"
-
+    
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "target_dir",
@@ -88,12 +89,8 @@ if __name__ == "__main__":
         if rcn_core.globals.POOL_EXECUTOR:
             rcn_core.globals.POOL_EXECUTOR.shutdown()
         
-        observers = (
-            rcn_core.globals.SERVER_WATCHDOG_OBSERVERS
-            + rcn_core.globals.PROXY_WATCHDOG_OBSERVERS
-            + rcn_core.globals.PY_WATCHDOG_OBSERVERS
-        )
-
+        observers = (rcn_core.globals.SERVER_WATCHDOG_OBSERVERS, )
+        
         for i in observers:
             try: i.stop(); i.join()
             except: pass

@@ -1,4 +1,3 @@
-
 import datetime
 import os
 import re
@@ -19,8 +18,12 @@ from .dorks import arrange_github_dorks_views
 from .dorks import arrange_shodan_dorks_views
 
 from rcn_web import storage
+from rcn_web.core.utils import get_storage, get_uniq_apps
 from rcn_web.core.scope import get_scope_wildcards
-from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
+from rcn_core.storage.bases import (
+    get_storage_create,
+    add_annotation as global_add_annotation,
+)
 
 from pentest_utils.viewers.emacs.utils import make_org_link
 from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
@@ -35,21 +38,23 @@ def get_cached_todos_status(app):
     Returns a string in the format "completed/total" or with green color if all completed.
     """
     try:
-        todos = get_storage_create("web-apps::annotations", parent_id=app['id']).get_filtered("key LIKE 'todo%'")
+        todos = get_storage_create(
+            "web-apps::annotations", parent_id=app["id"]
+        ).get_filtered("key LIKE 'todo%'")
         if not todos:
             return "0/0"
 
         total_todos = len(todos)
-        # Assuming TODO items starting with "DONE" are completed. 
+        # Assuming TODO items starting with "DONE" are completed.
         # Adjust logic if status is stored differently.
         completed_todos = len(
-            [t for t in todos if str(t['value']).strip().upper().startswith("DONE")]
+            [t for t in todos if str(t["value"]).strip().upper().startswith("DONE")]
         )
-        
+
         result = f"{completed_todos}/{total_todos}"
         if total_todos == completed_todos and total_todos > 0:
             return {"value": result, "fg": "green"}
-        
+
         return result
     except Exception:
         return "0/0"
@@ -57,28 +62,26 @@ def get_cached_todos_status(app):
 
 def elisp_view_app_annotations(app_id):
     app = get_app_by_site(get_storage(), app_id)
-    if not app: return {}
-    app_name = app['site']
-    
-    annotations = get_storage_create("web-apps::annotations", parent_id=app['id']).get_all_entries()
-    
+    if not app:
+        return {}
+    app_name = app["site"]
+
+    annotations = get_storage_create(
+        "web-apps::annotations", parent_id=app["id"]
+    ).get_all_entries()
+
     tabulated_format = [
         ["id", 15, True],
         ["key", 15, True],
         ["value", 80, True],
     ]
-    
+
     tabulated_entries = []
     for a in annotations:
-        tabulated_entries.append([
-            str(a['id']),
-            [
-                str(a['id']),
-                str(a['key']),
-                str(a['value'])
-            ]
-        ])
-        
+        tabulated_entries.append(
+            [str(a["id"]), [str(a["id"]), str(a["key"]), str(a["value"])]]
+        )
+
     return {
         "window-config": {
             "window-1": {
@@ -94,38 +97,38 @@ def elisp_view_app_annotations(app_id):
         "view-store": {
             "web-apps::annotations": {
                 "app-name": app_name,
-                "default-directory": sys.argv[1]
+                "default-directory": sys.argv[1],
             }
-        }
+        },
     }
 
 
 def elisp_view_app_todos(app_id):
     app = get_app_by_site(get_storage(), app_id)
-    
-    if not app: return {}
-    app_name = app['site']
-    
-    todos = [f"- {t['value']}" for t in get_storage_create("web-apps::annotations", parent_id=app['id']).get_filtered("key LIKE 'todo%'")]
-    
+
+    if not app:
+        return {}
+    app_name = app["site"]
+
+    todos = [
+        f"- {t['value']}"
+        for t in get_storage_create(
+            "web-apps::annotations", parent_id=app["id"]
+        ).get_filtered("key LIKE 'todo%'")
+    ]
+
     return {
         "buffer-name": f"*todos-{app_name}*",
         "mode": "org-mode",
-        "headline": {
-            "name": f"TODOs for {app_name}",
-            "entries": {
-                "TODOs": todos
-            }
-        },
+        "headline": {"name": f"TODOs for {app_name}", "entries": {"TODOs": todos}},
         "view-store": {
             "todos-data": {},
             "default-directory": sys.argv[1],
-        }
+        },
     }
 
 
 def elisp_view_target_apps(target, match_groups=None, create_windows=True, **kwargs):
-
     if not match_groups:
         match_groups = dict()
 
@@ -153,50 +156,41 @@ def elisp_view_target_apps(target, match_groups=None, create_windows=True, **kwa
             "buffer-store": {"parent_id": getattr(target, "id", None)},
         },
         "window-2": {
-            "window-config": {
-                "window-1": {
-                    "buffer-name": "*current-app-data*",
-                    "mode": "org-mode",
-                    "entries": {},
-                },
-                "window-2": {
-                    "mode": "vterm",
-                    "buffer-name": "vterm:url-interact",
-                    "no-create": True,
-                    "path": sys.argv[1],
-                },
-                "orientation": "vertical",
-                "scale": 0.6,
-            }
+            "buffer-name": "*current-app-data*",
+            "mode": "org-mode",
+            "entries": {},
         },
         "orientation": "horizontal",
         "scale": 0.4,
     }
-    
+
     collected["view-store"] = {
-        "apps-data": {"tabulated-data": {"get-ids-url": "http://localhost:8023/getApp"}},
+        "apps-data": {
+            "tabulated-data": {"get-ids-url": "http://localhost:8023/getApp"}
+        },
         "default-directory": sys.argv[1],
         "parent-storage": "targets",
-        "current-view": 1
+        "current-view": 1,
     }
-    
+
     print("took: ", time.time() - t1)
-    
-    if create_windows: return collected
-    else: return collected["window-config"]["window-1"]["entries"]
+
+    if create_windows:
+        return collected
+    else:
+        return collected["window-config"]["window-1"]["entries"]
 
 
 def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
-
     if match_groups is None:
         match_groups = dict()
 
     def apps_match_fn(e, value):
         app = e["obj"]
-        e["notes"] = NOTES_CONTENT.get(app['site'] + ".org", "")
+        e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
         return eval(value)
 
-    read_notes_files()
+    # read_notes_files()
 
     t1 = time.time()
 
@@ -233,13 +227,15 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
     tabl_entries = {}
     for app in apps:
         tbl = {}
-        tbl["id"] = str(app['id'])
+        tbl["id"] = str(app["id"])
         for attr in attrs + (("scheme", 0), ("url", 0)):
             tbl[attr[0]] = app[attr[0]]
 
         # arrange sources data
         for attr in st_attrs:
-            src = get_storage_create("web-apps::" + storage_mapping[attr[0]], parent_id=app['id'])
+            src = get_storage_create(
+                "web-apps::" + storage_mapping[attr[0]], parent_id=app["id"]
+            )
             l = src.length
             v = l
             tbl[attr[0]] = v
@@ -247,7 +243,7 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         # calculate TODOs status using cache
         tbl["todos"] = get_cached_todos_status(app)
 
-        tbl["at"] = app['timestamp']
+        tbl["at"] = app["timestamp"]
         tbl["obj"] = app
 
         tabl_entries[tbl["id"]] = tbl
@@ -274,7 +270,6 @@ storages_push_btn_mapping = {
 
 
 def elisp_make_target_view_data():
-
     global storages_push_btn_mapping
 
     target_vars = rcn_core.globals.YAML_FILE_CONTENT["target-data-variables"]
@@ -324,7 +319,10 @@ def elisp_make_target_view_data():
                             *[
                                 elisp_make_org_headline(
                                     name=" ".join(
-                                        i for i in get_storage()[ds].storage_name.split("-")
+                                        i
+                                        for i in get_storage()[ds].storage_name.split(
+                                            "-"
+                                        )
                                     ),
                                     entries=get_storage()[ds].get_data_preview(),
                                     push_btn="rcn-view--basic-push-btn",
@@ -360,7 +358,6 @@ def elisp_make_target_view_data():
 
 
 def _app_collect_notes(path):
-
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path.as_posix(), "w") as f:
@@ -408,42 +405,49 @@ def _app_collect_notes(path):
 
 
 def elisp_make_app_view_data(app):
-
     global storages_push_btn_mapping
 
     app_path = sys.argv[1]
-    path = pathlib.Path(os.path.join(sys.argv[1], "app-notes/", app['site'] + ".org"))
+    path = pathlib.Path(os.path.join(sys.argv[1], "app-notes/", app["site"] + ".org"))
 
     # app dorks
-    app_url = app['scheme'] + "://" + re.sub(":[0-9]+", "", app['site'])
+    app_url = app["scheme"] + "://" + re.sub(":[0-9]+", "", app["site"])
     dork = f"inurl:{app_url}"
 
-    annotations = [f"- {a['key']}: {a['value']}" for a in get_storage_create("web-apps::annotations", parent_id=app['id']).get_all_entries()[:10]]
+    annotations = [
+        f"- {a['key']}: {a['value']}"
+        for a in get_storage_create(
+            "web-apps::annotations", parent_id=app["id"]
+        ).get_all_entries()[:10]
+    ]
 
     app_data_raw = {
-        "id": app['id'],
-        "tech": app.get('technologies', ''),
-        "input": app.get('input_domain', ''),
-        "site": app['site'],
-        "host": app['host'],
-        "port": str(app['port']),
-        # "CDN": str(app['cdn']),
-        "scheme": app['scheme'],
-        "app-notes-path": path.as_posix(),
-        "app-path": app_path,
+        "id": app["id"],
+        "tech": app.get("technologies", ""),
+        "input": app.get("input_domain", ""),
+        "site": app["site"],
+        "host": app["host"],
+        "port": str(app["port"]),
+        "scheme": app["scheme"],
+        # "app-notes-path": path.as_posix(),
+        # "app-path": app_path,
     }
-    
+
     ip_entry_fn = 'elisp:(rcn-view-show-org-ip-entry "{ip}")'
     app_data = {
-        "IP entry": make_org_link(ip_entry_fn.format(ip=app['host']), app['host']),
-        "Tech": app.get('technologies', ''),
-        "Tags": app.get('tags', ''),
-        "browse Site": make_org_link(app['scheme'] + "://" + app['site'] + "/", app['site']),
-        "browse URL": make_org_link(app['url'], app['url']),
-        "browse host": make_org_link(app['scheme'] + "://" + app['host'] + "/", app['host']),
-        "host": app['host'],
+        "IP entry": make_org_link(ip_entry_fn.format(ip=app["host"]), app["host"]),
+        "Tech": app.get("technologies", ""),
+        "Tags": app.get("tags", ""),
+        "browse Site": make_org_link(
+            app["scheme"] + "://" + app["site"] + "/", app["site"]
+        ),
+        "browse URL": make_org_link(app["url"], app["url"]),
+        "browse host": make_org_link(
+            app["scheme"] + "://" + app["host"] + "/", app["host"]
+        ),
+        "host": app["host"],
         # "disabled": app['disabled'],
-        "Found At": datetime.datetime.fromtimestamp(app['timestamp']).isoformat(),
+        "Found At": datetime.datetime.fromtimestamp(app["timestamp"]).isoformat(),
     }
 
     data = {
@@ -462,13 +466,17 @@ def elisp_make_app_view_data(app):
                     ),
                     elisp_make_org_headline(
                         name="App Flows",
-                        entries={},
+                        entries=get_storage_create(
+                            "web-apps::app-flows", parent_id=app["id"]
+                        ).get_data_preview(),
                         push_btn="rcn-view-show-app-flows",
                     ),
                     *[
                         elisp_make_org_headline(
                             name=" ".join(i for i in ds.split("-")),
-                            entries=get_storage_create("web-apps::" + ds, parent_id=app['id']).get_data_preview(),
+                            entries=get_storage_create(
+                                "web-apps::" + ds, parent_id=app["id"]
+                            ).get_data_preview(),
                             push_btn=storages_push_btn_mapping.get(ds, None),
                         )
                         for ds in [
@@ -484,7 +492,11 @@ def elisp_make_app_view_data(app):
                         name="js files analysis",
                         entries={
                             "dir exists": os.path.exists(
-                                os.path.join(sys.argv[1], "js", re.sub(":[0-9]+", "", app['site']))
+                                os.path.join(
+                                    sys.argv[1],
+                                    "js",
+                                    re.sub(":[0-9]+", "", app["site"]),
+                                )
                             )
                         },
                         push_btn="rcn-view-show-app-js-files",
@@ -502,13 +514,12 @@ def elisp_make_app_view_data(app):
 
 
 def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwargs):
-
     if match_groups is None:
         match_groups = dict()
 
     def apps_match_fn(e, value):
         app = e["obj"]
-        e["notes"] = NOTES_CONTENT.get(app['site'] + ".org", "")
+        e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
         return eval(value)
 
@@ -526,7 +537,7 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
     tabl_entries = {}
     for app in apps:
         tbl = {}
-        tbl["id"] = str(app['id'])
+        tbl["id"] = str(app["id"])
 
         ## collect properties
         for attr in attrs:
@@ -536,7 +547,9 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         tabl_entries[tbl["id"]] = tbl
 
         # count the number of links in the app
-        tbl["links"] = get_storage_create("web-apps::app-links", parent_id=app['id']).length
+        tbl["links"] = get_storage_create(
+            "web-apps::app-links", parent_id=app["id"]
+        ).length
 
         # calculate TODOs status using cache
         tbl["todos"] = get_cached_todos_status(app)
@@ -558,7 +571,6 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
 def elisp_view_target_apps_with_links(
     target, match_groups=None, create_windows=True, **kwargs
 ):
-
     if not match_groups:
         match_groups = dict()
 

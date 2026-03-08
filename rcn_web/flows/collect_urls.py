@@ -9,6 +9,7 @@ from collections import defaultdict
 
 from pentest_utils.web.request import detect_content_type, parse_by_content_type
 from rcn_core.storage.bases import get_storage_create
+from rcn_web.core.utils import get_app_by_site
 
 # from rcn_web.core.utils import *
 # from rcn_web.storage.url import form_to_request

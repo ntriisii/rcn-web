@@ -17,3 +17,6 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["rcn_web"]
+
+[tool.uv.sources]
+rcn-core = { path = "/home/ahmed/programming-projects/python/rcn-core/", editable = true }

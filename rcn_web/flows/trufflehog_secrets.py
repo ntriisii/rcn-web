@@ -17,6 +17,7 @@ import hashlib
 
 from collections import defaultdict
 from rcn_core.storage.bases import get_storage_create
+from rcn_web.core.utils import get_app_by_site
 
 
 TRF_LAST_CHECK_TIME = time.time()

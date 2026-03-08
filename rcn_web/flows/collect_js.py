@@ -11,6 +11,7 @@ import aiofiles as aiof
 from collections import defaultdict
 from urllib.parse import urlparse, unquote_plus
 from rcn_core.storage.bases import get_storage_create
+from rcn_web.core.utils import get_app_by_site
 
 # Global state for batching
 JS_COLLECTED_FLOWS = []

@@ -87,7 +87,7 @@ def elisp_make_basic_storage_view(dstorage, *args, **kwargs):
 
 def elisp_make_basic_data_preview(dstorage, *args, **kwargs):
     content = dict()
-
+    
     content["data Length"] = dstorage.length
 
     return content
