@@ -1,4 +1,3 @@
-
 import os
 import sys
 import time
@@ -32,7 +31,9 @@ async def extract_js_files(flow):
             is_js = True
 
     if is_js:
-        JS_COLLECTED_FLOWS.append({"url": flow["url"], "response": flow["response-body"]})
+        JS_COLLECTED_FLOWS.append(
+            {"url": flow["url"], "response": flow["response-body"]}
+        )
 
     # Batching logic: return accumulated flows only after interval or if enough gathered
     # Here we stick to time-based as in original, but could add count threshold
@@ -46,7 +47,8 @@ async def extract_js_files(flow):
 
 
 async def handle_collected_js_files(s, extractor, js_content):
-    if not js_content: return
+    if not js_content:
+        return
 
     # Group by site
     found_sites = defaultdict(list)
@@ -66,11 +68,13 @@ async def handle_collected_js_files(s, extractor, js_content):
                 fname = f"js_analysis_{rand_suffix}.js"
                 temp_path = os.path.join("/tmp", fname)
 
-                async with aiof.open(temp_path, "w") as f: await f.write(entry["response"])
+                async with aiof.open(temp_path, "w") as f:
+                    await f.write(entry["response"])
 
                 temp_files.append(temp_path)
 
-            if temp_files: await js_analysis_run_flow_on_files(s, temp_files, site)
+            if temp_files:
+                await js_analysis_run_flow_on_files(s, temp_files, site)
 
         finally:
             # Cleanup temp files
@@ -83,8 +87,15 @@ async def handle_collected_js_files(s, extractor, js_content):
 
 
 async def js_analysis_run_flow_on_files(s, paths, app_name):
-    # Assuming s.get_rcn_flows() works as before
-    flow_cls = s.get_rcn_flows().get("js-analysis-with-jsluice")
+    import rcn_core.globals
+
+    # Use global RCN_FLOWS directly or via storage method
+    if hasattr(s, "get_rcn_flows"):
+        flows = s.get_rcn_flows()
+    else:
+        flows = rcn_core.globals.RCN_FLOWS
+
+    flow_cls = flows.get("js-analysis-with-jsluice")
     if not flow_cls:
         print("js-analysis-with-jsluice flow not found")
         return
@@ -100,35 +111,49 @@ async def js_analysis_run_flow_on_files(s, paths, app_name):
         print(f"Error running js analysis flow: {e}")
         return
 
-    if not out: return
+    if not out:
+        return
 
     app = get_app_by_site(s, app_name)
     if not app:
         app = get_app_by_site(s, app_name)
-        if not app: return
+        if not app:
+            return
 
     # Collect data by type
     links = []
     secrets = []
     for i in out:
-        if "kind" in i.keys(): secrets.append(i)
-        else: links.append(i)
+        if "kind" in i.keys():
+            secrets.append(i)
+        else:
+            links.append(i)
 
     if links:
-        lst = get_storage_create("web-apps::js-links", parent_id=app['id'])
+        lst = get_storage_create("web-apps::js-links", parent_id=app["id"])
         # Add proper source and original keys if missing, though logic implies they exist
         lst.add_many(
-            [{"url": i.get("url"), "source": i.get("source"), "original": i.get("original")}
-             for i in links
+            [
+                {
+                    "url": i.get("url"),
+                    "source": i.get("source"),
+                    "original": i.get("original"),
+                }
+                for i in links
             ],
             source="jsluice",
         )
 
     if secrets:
-        sst = get_storage_create("web-apps::js-secrets", parent_id=app['id'])
+        sst = get_storage_create("web-apps::js-secrets", parent_id=app["id"])
         sst.add_many(
-            [{"source": i.get("source"), "reason": i.get("reason"), "match": i.get("match")}
-             for i in secrets
-             ],
+            [
+                {
+                    "source": i.get("source"),
+                    "reason": i.get("reason"),
+                    "match": i.get("match"),
+                }
+                for i in secrets
+            ],
             source="jsluice",
         )
