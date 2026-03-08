@@ -131,13 +131,14 @@ async def crawl_application(event, scheduled_md):
             async with aiof.open(tmp_file_path, "w") as f:
                 await f.write("\n".join(apps_links))
 
+            print()
             # TODO: don't use proxy and create a flow that can translate to a piped operation
             # to handle application data and what you want from it.
             from rcn_core.time_event import start_scheduled_process
-
+            
             try:
                 await start_scheduled_process(
-                    f"rr katana -u {tmp_file_path} {kt_additional_args} ---chunks-per-host 1 -ob -jc -jsl -silent -aff -fx -j -proxy http://localhost:8081 -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -kf all -xhr ---debug | jq -c 'del(.response.body) | del(.response.raw)' ",
+                    f"rr katana -u {tmp_file_path} {kt_additional_args} ---chunks-per-host 1 -ob -jc -jsl -silent -aff -fx -j -proxy http://localhost:8081 -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -kf all -xhr -timeout 20 | jq -c 'del(.response.body) | del(.response.raw)' ",
                     timeout=event.get("timeout"),
                     debug=event.get("debug"),
                     name=event.get("name"),
