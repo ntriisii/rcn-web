@@ -65,7 +65,6 @@ async def js_intelligence_monitor(event, scheduled_md):
         semaphore = asyncio.Semaphore(5)
 
         async with aiohttp.ClientSession() as session:
-            tasks = []
             for app_id, data in app_js_map.items():
                 app = data["app"]
                 project_name = data["target_name"]
@@ -73,29 +72,38 @@ async def js_intelligence_monitor(event, scheduled_md):
                 # Ensure jxscout is running for this target
                 await start_jxscout(project_name)
 
-                for js_link in data["links"]:
-                    tasks.append(
-                        handle_monitor_js_link(
-                            session, semaphore, app, js_link, project_name
-                        )
+                links_tasks = [
+                    handle_monitor_js_link(
+                        session, semaphore, app, js_link, project_name
                     )
+                    for js_link in data["links"]
+                ]
 
-            if tasks:
-                await asyncio.gather(*tasks)
+                # Process all links for this app
+                results = await asyncio.gather(*links_tasks)
+
+                # Batch update inventory for this app
+                inventory_entries = [r for r in results if r is not None]
+                if inventory_entries:
+                    js_inventory = get_storage_create(
+                        "web-apps::js-inventory", parent_id=app_id
+                    )
+                    js_inventory.add_many(inventory_entries, source="js_monitor")
 
 
 async def handle_monitor_js_link(session, semaphore, app, js_link, project_name):
     """
     Handles the lifecycle of a single JS link within the monitor.
+    Returns the inventory entry if analysis was triggered, else None.
     """
     url = js_link.get("url")
     if not url or not url.endswith(".js"):
-        return
+        return None
 
     # Only analyze if the domain is in scope
     domain = urlparse(url).netloc
     if not is_in_scope(domain):
-        return
+        return None
 
     async with semaphore:
         try:
@@ -105,7 +113,7 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
             # Use a short timeout for the monitor fetch
             async with session.get(url, proxy=proxy, timeout=30) as resp:
                 if resp.status != 200:
-                    return
+                    return None
                 content = await resp.text()
 
             current_hash = await get_js_hash(content)
@@ -121,7 +129,7 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
                     is_changed = False
 
             if is_changed:
-                # Update inventory
+                # Prepare inventory entry
                 inventory_entry = {
                     "url": url,
                     "hash": current_hash,
@@ -129,13 +137,14 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
                     "is_third_party": is_third_party(url, content),
                     "status": "pending_analysis",
                 }
-                js_inventory.add_many([inventory_entry], source="js_monitor")
 
                 # Trigger Analysis Pipeline
                 await process_js_file(app, url, content, current_hash, project_name)
+                return inventory_entry
 
         except Exception as e:
             rlog(f"Error monitoring JS {url}: {e}", level="error")
+    return None
 
 
 async def process_js_file(
