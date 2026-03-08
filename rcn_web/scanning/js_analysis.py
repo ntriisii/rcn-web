@@ -143,22 +143,13 @@ async def process_js_file(
     rlog(f"Processing JS file: {url}")
 
     # 1. Recovery/Deobfuscation
-    # Check if jxscout has already reconstructed this
-    jx_path = get_jxscout_path(project_name)
-    recovery_success = False
-
-    if os.path.exists(jx_path):
-        # Logic to match URL to jxscout directory structure
-        # (Simplified: check if anything exists in jx_path)
-        # For now, we still use webcrack as primary local deobfuscator
-        unpacked_path, recovery_success = await deobfuscate_js(content, url)
-    else:
-        unpacked_path, recovery_success = await deobfuscate_js(content, url)
+    # Primary: deobfuscate the current content
+    unpacked_path, deobf_success = await deobfuscate_js(content, url)
 
     # 2. Tools Analysis
     all_findings = []
 
-    # Semgrep
+    # Semgrep - Run on the unpacked source
     semgrep_findings = await run_semgrep(unpacked_path)
     for f in semgrep_findings:
         all_findings.append(
@@ -171,6 +162,24 @@ async def process_js_file(
                 "severity": f.get("extra", {}).get("severity"),
             }
         )
+
+    # also check if jxscout has reconstructed files for this domain
+    jx_path = get_jxscout_path(project_name)
+    domain = urlparse(url).netloc
+    asset_path = os.path.join(jx_path, "assets", domain)
+    if os.path.exists(asset_path):
+        # Scan jxscout recovered sources too
+        jx_semgrep = await run_semgrep(asset_path)
+        for f in jx_semgrep:
+            all_findings.append(
+                {
+                    "type": "semgrep-jxscout",
+                    "rule": f.get("check_id"),
+                    "location": f.get("path"),
+                    "line": f.get("start", {}).get("line"),
+                    "severity": f.get("extra", {}).get("severity"),
+                }
+            )
 
     # jsluice (run on all files in unpacked_path)
     for root, dirs, files in os.walk(unpacked_path):
@@ -215,27 +224,40 @@ async def process_js_file(
 
     # 3. AI Delegation (Only if not third party)
     if not is_third_party(url, content):
-        await delegate_to_ai_js_analysis(app, url, unpacked_path, all_findings)
+        # Read some context from unpacked files
+        context_files = []
+        for root, dirs, files in os.walk(unpacked_path):
+            for file in files:
+                if file.endswith(".js") and len(context_files) < 10:
+                    context_files.append(os.path.join(root, file))
+
+        # Also check jxscout files if any
+        if os.path.exists(asset_path):
+            for root, dirs, files in os.walk(asset_path):
+                for file in files:
+                    if (file.endswith(".js") or file.endswith(".ts")) and len(
+                        context_files
+                    ) < 20:
+                        context_files.append(os.path.join(root, file))
+
+        await delegate_to_ai_js_analysis(app, url, context_files, all_findings)
 
 
-async def delegate_to_ai_js_analysis(app, url, source_path, tool_findings):
+async def delegate_to_ai_js_analysis(app, url, file_paths, tool_findings):
     """
     Prepares payload and delegates to AI via ACP.
     """
-    # Sample code from the recovered source
-    # We might want to read a few interesting files
     code_samples = ""
-    count = 0
-    for root, dirs, files in os.walk(source_path):
-        for file in files:
-            if file.endswith(".js") and count < 5:
-                fpath = os.path.join(root, file)
-                async with aiof.open(fpath, "r") as f:
-                    code = await f.read()
-                    code_samples += (
-                        f"\nFILE: {file}\n```javascript\n{code[:2000]}\n```\n"
-                    )
-                count += 1
+    for fpath in file_paths:
+        try:
+            async with aiof.open(fpath, "r") as f:
+                code = await f.read()
+                filename = os.path.basename(fpath)
+                code_samples += (
+                    f"\nFILE: {filename}\n```javascript\n{code[:1500]}\n```\n"
+                )
+        except:
+            continue
 
     ai_prompt = f"""
 I need you to perform a deep security analysis of the following JavaScript source code recovered from {url}.

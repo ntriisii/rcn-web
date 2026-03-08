@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import asyncio
 import aiofiles as aiof
+import re
 from urllib.parse import urlparse
 from rcn_core.log import rlog
 
@@ -84,6 +85,33 @@ async def run_semgrep(target_path: str):
     return []
 
 
+def extract_secrets_regex(content: str):
+    """
+    Fallback regex-based secret extraction.
+    """
+    patterns = {
+        "AWS API Key": r"AKIA[0-9A-Z]{16}",
+        "Generic Secret": r"(?i)(key|secret|token|auth|password|passwd|pass)[\s:='\"]+[0-9a-zA-Z]{32,}",
+        "Firebase URL": r"https://[a-z0-9.-]+\.firebaseio\.com",
+        "Google API Key": r"AIza[0-9A-Za-z\\-_]{35}",
+        "Slack Token": r"xox[baprs]-[0-9a-zA-Z]{10,48}",
+    }
+    findings = []
+    for name, pattern in patterns.items():
+        for match in re.finditer(pattern, content):
+            findings.append(
+                {
+                    "kind": "regex-secret",
+                    "reason": name,
+                    "match": match.group(0),
+                    "context": content[
+                        max(0, match.start() - 50) : min(len(content), match.end() + 50)
+                    ],
+                }
+            )
+    return findings
+
+
 async def run_jsluice(js_file_path: str):
     """
     Runs jsluice to extract urls and secrets.
@@ -91,6 +119,13 @@ async def run_jsluice(js_file_path: str):
     findings = []
     # Use full path to jsluice
     jsluice_path = "/home/ahmed/.local/bin/jsluice"
+
+    if not os.path.exists(jsluice_path):
+        # Fallback to regex
+        async with aiof.open(js_file_path, "r") as f:
+            content = await f.read()
+        return extract_secrets_regex(content)
+
     # URLs
     rc, stdout, stderr = await run_command([jsluice_path, "urls", js_file_path])
     if rc == 0:
@@ -174,7 +209,7 @@ async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex(("localhost", port)) == 0:
-                rlog(f"jxscout already running on port {port}")
+                # rlog(f"jxscout already running on port {port}")
                 return True
 
         process = await asyncio.create_subprocess_exec(
@@ -194,6 +229,9 @@ async def run_nuclei_js(url: str):
     Runs nuclei on a JS URL with specific security templates.
     """
     nuclei_path = "/home/ahmed/.local/bin/nuclei"
+    if not os.path.exists(nuclei_path):
+        return []
+
     rc, stdout, stderr = await run_command(
         [
             nuclei_path,
