@@ -62,62 +62,76 @@ async def js_intelligence_monitor(event, scheduled_md):
                 app_js_map[app["id"]] = {"app": app, "links": []}
             app_js_map[app["id"]]["links"].append(item["entry"])
 
+        # Limit concurrency to avoid overwhelming the target or proxy
+        semaphore = asyncio.Semaphore(5)
+
         async with aiohttp.ClientSession() as session:
+            tasks = []
             for app_id, data in app_js_map.items():
                 app = data["app"]
-                js_inventory = get_storage_create(
-                    "web-apps::js-inventory", parent_id=app_id
-                )
-
                 for js_link in data["links"]:
-                    url = js_link.get("url")
-                    if not url or not url.endswith(".js"):
-                        continue
+                    tasks.append(
+                        handle_monitor_js_link(
+                            session, semaphore, app, js_link, project_name
+                        )
+                    )
 
-                    # Only analyze if the domain is in scope
-                    domain = urlparse(url).netloc
-                    if not is_in_scope(domain):
-                        continue
+            if tasks:
+                await asyncio.gather(*tasks)
 
-                    try:
-                        async with session.get(url, timeout=30) as resp:
-                            if resp.status != 200:
-                                continue
-                            content = await resp.text()
 
-                        current_hash = await get_js_hash(content)
+async def handle_monitor_js_link(session, semaphore, app, js_link, project_name):
+    """
+    Handles the lifecycle of a single JS link within the monitor.
+    """
+    url = js_link.get("url")
+    if not url or not url.endswith(".js"):
+        return
 
-                        # Check inventory
-                        existing = js_inventory.get_filtered(f"url = '{url}'")
-                        is_changed = True
-                        if existing:
-                            if existing[0].get("hash") == current_hash:
-                                is_changed = False
+    # Only analyze if the domain is in scope
+    domain = urlparse(url).netloc
+    if not is_in_scope(domain):
+        return
 
-                        if is_changed:
-                            # Update inventory
-                            inventory_entry = {
-                                "url": url,
-                                "hash": current_hash,
-                                "last_seen": time.time(),
-                                "is_third_party": is_third_party(url, content),
-                                "status": "pending_analysis",
-                            }
-                            js_inventory.add_many(
-                                [inventory_entry], source="js_monitor"
-                            )
+    async with semaphore:
+        try:
+            # Route through jxscout proxy (default 3333) if running
+            proxy = "http://localhost:3333"
 
-                            # Trigger Analysis Pipeline for this file
-                            # Optional: fetch via jxscout proxy (already running)
-                            # We can trigger a background request if needed,
-                            # but for now we rely on the monitor session.
+            # Use a short timeout for the monitor fetch
+            async with session.get(url, proxy=proxy, timeout=30) as resp:
+                if resp.status != 200:
+                    return
+                content = await resp.text()
 
-                            await process_js_file(
-                                app, url, content, current_hash, project_name
-                            )
+            current_hash = await get_js_hash(content)
+            js_inventory = get_storage_create(
+                "web-apps::js-inventory", parent_id=app["id"]
+            )
 
-                    except Exception as e:
-                        rlog(f"Error monitoring JS {url}: {e}", level="error")
+            # Check inventory
+            existing = js_inventory.get_filtered(f"url = '{url}'")
+            is_changed = True
+            if existing:
+                if existing[0].get("hash") == current_hash:
+                    is_changed = False
+
+            if is_changed:
+                # Update inventory
+                inventory_entry = {
+                    "url": url,
+                    "hash": current_hash,
+                    "last_seen": time.time(),
+                    "is_third_party": is_third_party(url, content),
+                    "status": "pending_analysis",
+                }
+                js_inventory.add_many([inventory_entry], source="js_monitor")
+
+                # Trigger Analysis Pipeline
+                await process_js_file(app, url, content, current_hash, project_name)
+
+        except Exception as e:
+            rlog(f"Error monitoring JS {url}: {e}", level="error")
 
 
 async def process_js_file(
