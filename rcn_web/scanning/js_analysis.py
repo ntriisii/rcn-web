@@ -28,7 +28,8 @@ from rcn_web.core.js_utils import (
     run_ppmap,
     is_third_party,
     start_jxscout,
-    fetch_via_jxscout,
+    run_nuclei_js,
+    get_jxscout_path,
 )
 
 
@@ -42,8 +43,8 @@ async def js_intelligence_monitor(event, scheduled_md):
 
     # Ensure jxscout is running for the current target if configured
     target_obj = event.get("target")
+    project_name = "default_target"
     if target_obj:
-        # MultiTargetStorage might have targets dict, or it might be a single TargetStorage
         project_name = getattr(target_obj, "name", "default_target")
         await start_jxscout(project_name)
 
@@ -107,26 +108,38 @@ async def js_intelligence_monitor(event, scheduled_md):
                             )
 
                             # Trigger Analysis Pipeline for this file
-                            # (We'll do this in a separate event or here directly)
+                            # Optional: fetch via jxscout proxy (already running)
+                            # We can trigger a background request if needed,
+                            # but for now we rely on the monitor session.
 
-                            # Optional: reconstruct via jxscout
-                            await fetch_via_jxscout(url)
-
-                            # For now, let's process it
-                            await process_js_file(app, url, content, current_hash)
+                            await process_js_file(
+                                app, url, content, current_hash, project_name
+                            )
 
                     except Exception as e:
                         rlog(f"Error monitoring JS {url}: {e}", level="error")
 
 
-async def process_js_file(app, url, content, content_hash):
+async def process_js_file(
+    app, url, content, content_hash, project_name="default_target"
+):
     """
     Core pipeline for a single JS file.
     """
     rlog(f"Processing JS file: {url}")
 
-    # 1. Deobfuscate
-    unpacked_path, success = await deobfuscate_js(content, url)
+    # 1. Recovery/Deobfuscation
+    # Check if jxscout has already reconstructed this
+    jx_path = get_jxscout_path(project_name)
+    recovery_success = False
+
+    if os.path.exists(jx_path):
+        # Logic to match URL to jxscout directory structure
+        # (Simplified: check if anything exists in jx_path)
+        # For now, we still use webcrack as primary local deobfuscator
+        unpacked_path, recovery_success = await deobfuscate_js(content, url)
+    else:
+        unpacked_path, recovery_success = await deobfuscate_js(content, url)
 
     # 2. Tools Analysis
     all_findings = []
@@ -158,6 +171,19 @@ async def process_js_file(app, url, content, content_hash):
     pp_result = await run_ppmap(url)
     if pp_result:
         all_findings.append({"type": "ppmap", "evidence": pp_result})
+
+    # Nuclei
+    nuclei_findings = await run_nuclei_js(url)
+    for nf in nuclei_findings:
+        all_findings.append(
+            {
+                "type": "nuclei",
+                "template": nf.get("template-id"),
+                "info": nf.get("info", {}).get("name"),
+                "matcher": nf.get("matcher-name"),
+                "extracted": nf.get("extracted-results"),
+            }
+        )
 
     # Store results in js-intelligence
     js_intel = get_storage_create("web-apps::js-intelligence", parent_id=app["id"])

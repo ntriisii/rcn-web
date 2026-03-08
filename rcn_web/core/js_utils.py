@@ -189,15 +189,33 @@ async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
         return False
 
 
-async def fetch_via_jxscout(url: str, jxscout_port: int = 3333):
+async def run_nuclei_js(url: str):
     """
-    Triggers a fetch of the URL through jxscout proxy to enable source reconstruction.
+    Runs nuclei on a JS URL with specific security templates.
     """
-    proxy_url = f"http://localhost:{jxscout_port}"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, proxy=proxy_url, timeout=30) as resp:
-                return resp.status == 200
-    except Exception as e:
-        rlog(f"Error fetching via jxscout: {e}", level="error")
-        return False
+    nuclei_path = "/home/ahmed/.local/bin/nuclei"
+    rc, stdout, stderr = await run_command(
+        [
+            nuclei_path,
+            "-it",
+            "xss,prototype-pollution,postmessage,exposure,token,secret",
+            "-u",
+            url,
+            "-jsonl",
+        ]
+    )
+    findings = []
+    if rc == 0:
+        for line in stdout.splitlines():
+            try:
+                findings.append(json.loads(line))
+            except:
+                pass
+    return findings
+
+
+def get_jxscout_path(project_name: str):
+    """
+    Returns the path to jxscout's project directory.
+    """
+    return os.path.expanduser(f"~/jxscout/{project_name}")
