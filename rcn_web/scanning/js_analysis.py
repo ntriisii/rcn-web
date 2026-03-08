@@ -41,13 +41,6 @@ async def js_intelligence_monitor(event, scheduled_md):
     """
     scanner_name = event["name"]
 
-    # Ensure jxscout is running for the current target if configured
-    target_obj = event.get("target")
-    project_name = "default_target"
-    if target_obj:
-        project_name = getattr(target_obj, "name", "default_target")
-        await start_jxscout(project_name)
-
     async with get_unprocessed_entries(
         scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
@@ -58,8 +51,14 @@ async def js_intelligence_monitor(event, scheduled_md):
         app_js_map = {}
         for item in unscanned.values():
             app = item["parent"]
+            target_name = item.get("target_name", "default_target")
+
             if app["id"] not in app_js_map:
-                app_js_map[app["id"]] = {"app": app, "links": []}
+                app_js_map[app["id"]] = {
+                    "app": app,
+                    "links": [],
+                    "target_name": target_name,
+                }
             app_js_map[app["id"]]["links"].append(item["entry"])
 
         # Limit concurrency to avoid overwhelming the target or proxy
@@ -69,6 +68,11 @@ async def js_intelligence_monitor(event, scheduled_md):
             tasks = []
             for app_id, data in app_js_map.items():
                 app = data["app"]
+                project_name = data["target_name"]
+
+                # Ensure jxscout is running for this target
+                await start_jxscout(project_name)
+
                 for js_link in data["links"]:
                     tasks.append(
                         handle_monitor_js_link(
