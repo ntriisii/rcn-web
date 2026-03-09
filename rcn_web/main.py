@@ -409,9 +409,15 @@ async def get_entry_by_id(
         e = make_basic_dict_entry_view(data[0])
         return JSONResponse(e)
 
-    app = get_app_by_site(get_storage(), app_name)
+    app = None
+    if app_name:
+        app = get_app_by_id(get_storage(), app_name)
+    if not app and app_name:
+        app = get_app_by_site(get_storage(), app_name)
+
     if not app:
         return JSONResponse({"error": "app not found"}, status_code=404)
+
     st = get_storage_create(storage_name, parent_id=app["id"])
 
     if not st:
