@@ -325,7 +325,7 @@ def elisp_make_target_view_data():
                                         )
                                     ),
                                     entries=get_storage()[ds].get_data_preview(),
-                                    push_btn="rcn-view--basic-push-btn",
+                                    storage_name=get_storage()[ds].storage_name,
                                 )
                                 for ds in get_storage().data_storages_names
                             ],
@@ -478,6 +478,7 @@ def elisp_make_app_view_data(app):
                                 "web-apps::" + ds, parent_id=app["id"]
                             ).get_data_preview(),
                             push_btn=storages_push_btn_mapping.get(ds, None),
+                            storage_name="web-apps::" + ds,
                         )
                         for ds in [
                             "app-links",

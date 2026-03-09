@@ -87,19 +87,23 @@ def elisp_make_basic_storage_view(dstorage, *args, **kwargs):
 
 def elisp_make_basic_data_preview(dstorage, *args, **kwargs):
     content = dict()
-    
+
     content["data Length"] = dstorage.length
 
     return content
 
 
-def elisp_make_org_headline(name, entries, push_btn=None):
+def elisp_make_org_headline(name, entries, push_btn=None, storage_name=None):
     headline = {
         "entries": {},
         "name": name,
     }
     if push_btn:
         headline["push-btn-fn"] = push_btn
+    elif storage_name:
+        headline["push-btn-fn"] = (
+            f'(lambda () (interactive) (rcn-view--basic-push-btn-with-storage "{storage_name}"))'
+        )
     else:
         headline["push-btn-fn"] = "rcn-view--basic-push-btn"
 
