@@ -22,12 +22,12 @@ def elisp_make_basic_tabulated_entries(dstorage, attrs=None, *args, **kwargs):
     # check if the entry is dict or not if not return very basic view
     if type(first_entry) is list:
         tabulated_entries, tabulated_format = make_preview_tabulated_entries(
-            tabl_entries=[{"entry": i[0]} for i in entries], attrs=(("entry", 100))
+            storage_instance=[{"entry": i[0]} for i in entries], attrs=(("entry", 100),)
         )
 
     elif type(first_entry) in (str, int):
         tabulated_entries, tabulated_format = make_preview_tabulated_entries(
-            tabl_entries=[{"entry": i} for i in entries],
+            storage_instance=[{"entry": i} for i in entries],
             attrs=(("entry", 100),),
         )
 
@@ -54,7 +54,7 @@ def elisp_make_basic_tabulated_entries(dstorage, attrs=None, *args, **kwargs):
         keys_to_show.insert(0, "id")
         attrs = tuple((i, padding_per_entry) for i in keys_to_show)
         tabulated_entries, tabulated_format = make_preview_tabulated_entries(
-            tabl_entries=entries, attrs=attrs, include_id=False
+            storage_instance=entries, attrs=attrs, include_id=False
         )
 
     return tabulated_entries, tabulated_format
