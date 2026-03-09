@@ -332,10 +332,7 @@ async def get_app(content: Request):
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
 
-        full_storage_name = (
-            storage_name if "::" in storage_name else "web-apps::" + storage_name
-        )
-        st = get_storage_create(full_storage_name, parent_id=app["id"])
+        st = get_storage_create(storage_name, parent_id=app["id"])
 
         if not st:
             return JSONResponse(
@@ -413,12 +410,11 @@ async def get_entry_by_id(
         return JSONResponse(e)
 
     app = get_app_by_site(get_storage(), app_name)
-        if not app:
-            return JSONResponse({"error": "app not found"}, status_code=404)
-        st = get_storage_create(storage_name, parent_id=app["id"])
+    if not app:
+        return JSONResponse({"error": "app not found"}, status_code=404)
+    st = get_storage_create(storage_name, parent_id=app["id"])
 
-        if not st:
-
+    if not st:
         return JSONResponse("storage not found", status_code=404)
 
     data = [i for i in st.get() if i["id"] == entry_id]
