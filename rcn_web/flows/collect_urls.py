@@ -203,7 +203,10 @@ async def handle_collected_urls(st, extractor, content):
 
             if is_js:
                 js_flows_to_add.append({"flow-id": flow_id, "path": path})
-                js_links_to_add.append({"url": url})
+                # Copy the full entry for js-links to keep metadata
+                js_link_entry = entry.copy()
+                js_link_entry["path"] = path
+                js_links_to_add.append(js_link_entry)
 
             # save some space by removing the URL and rebuild it when required
             entry["path"] = path
