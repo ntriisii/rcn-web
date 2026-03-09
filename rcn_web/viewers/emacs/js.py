@@ -1,5 +1,8 @@
 import sys
-from rcn_web.viewers.emacs.utils import make_preview_tabulated_entries
+from rcn_web.viewers.emacs.utils import (
+    make_preview_tabulated_entries,
+    elisp_make_basic_storage_view,
+)
 
 
 def elisp_view_js_flows(
@@ -208,4 +211,16 @@ def js_links_preview_data(sto, page=0, reset_page_counter=False, match_groups=No
     data_length = len(sto)
     tr["Found URLs length "] = data_length
 
+    return tr
+
+
+def elisp_view_js_secrets(
+    secret_storage, create_windows=False, match_groups=None, *args, **kwargs
+):
+    return elisp_make_basic_storage_view(secret_storage, *args, **kwargs)
+
+
+def js_secrets_preview_data(sto, *args, **kwargs):
+    tr = dict()
+    tr["Secrets count"] = len(sto)
     return tr
