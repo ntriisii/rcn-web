@@ -10,9 +10,13 @@ router.include_router(agent_ws_router)
 
 
 @router.websocket("/connect-ws/")
-async def websocket_connect(websocket: WebSocket):
+@router.websocket("/{target_name}/connect-ws/")
+async def websocket_connect(websocket: WebSocket, target_name: Optional[str] = None):
+    # If target_name is provided in the URL, use it to distinguish connections
+    conn_id = f"emacs-conn-{target_name}" if target_name else "emacs-conn"
+
     conn = WSConnectionManager()
-    await conn.ws_connect("emacs-proxy", "emacs-conn", websocket)
+    await conn.ws_connect("emacs-proxy", conn_id, websocket)
 
     try:
         update_ws_obj: "ProxyWebSocket" = conn.get_ws()

@@ -135,8 +135,22 @@ async def request(flow: HTTPFlow):
 
     flow.request.host = "localhost"
     flow.request.port = TARGET_TO_PORT_MAPPING[target_name]
-    new_path = "/" + "/".join(path_parts[1:])
-    flow.request.path = new_path
+
+    # IMPORTANT: Update the Host header to match the new destination
+    # This often fixes 403 Forbidden errors in WebSocket handshakes
+    flow.request.headers["Host"] = f"localhost:{flow.request.port}"
+
+    # Optional: ensure Origin matches if necessary
+    # if "Origin" in flow.request.headers:
+    #     flow.request.headers["Origin"] = f"http://localhost:{flow.request.port}"
+
+    # If it's a websocket handshake, keep the full path so the downstream handles target_name
+    if flow.request.headers.get("Upgrade", "").lower() == "websocket":
+        # Downstream now handles /{target_name}/connect-ws/
+        pass
+    else:
+        new_path = "/" + "/".join(path_parts[1:])
+        flow.request.path = new_path
 
 
 async def websocket_start(flow: HTTPFlow):
