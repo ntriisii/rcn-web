@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pentest_utils.web.websockets import WSConnectionManager, ProxyWebSocket
 from rcn_core.core_ws import create_agent_websocket_router
