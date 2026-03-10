@@ -34,41 +34,46 @@ async def run_command(cmd: list, cwd=None, input_data=None):
 
 async def deobfuscate_js(js_content: str, url: str):
     """
-    Uses webcrack to deobfuscate/deminify JS content.
-    Returns a directory path containing the unpacked source.
+    Uses multiple tools to deobfuscate/deminify JS content.
     """
     tmp_dir = tempfile.mkdtemp(prefix="rcn_js_unpacked_")
     js_file = os.path.join(tmp_dir, "input.js")
     async with aiof.open(js_file, "w") as f:
         await f.write(js_content)
 
-    # Use installed webcrack if available, otherwise fallback to npx
     webcrack_path = os.path.expanduser("~/.npm-global/bin/webcrack")
+    synchrony_path = os.path.expanduser("~/.npm-global/bin/synchrony")
     beautify_path = os.path.expanduser("~/.npm-global/bin/js-beautify")
     unpacked_dir = os.path.join(tmp_dir, "unpacked")
 
-    # Try full webcrack first
+    # 1. Try Synchrony first (it's more stable on modern Node)
+    if os.path.exists(synchrony_path):
+        sync_out = os.path.join(tmp_dir, "sync_deobf.js")
+        rc, stdout, stderr = await run_command(
+            [synchrony_path, "deobfuscate", js_file, "-o", sync_out]
+        )
+        if rc == 0 and os.path.exists(sync_out):
+            rlog(f"Synchrony successfully deobfuscated {url}")
+            # Use the deobfuscated file as input for webcrack (unpacking)
+            js_file = sync_out
+
+    # 2. Use webcrack for unpacking/unminifying
+    # Since isolated-vm is broken in this env, we default to --no-deobfuscate to avoid noise
     if os.path.exists(webcrack_path):
-        cmd = [webcrack_path, js_file, "-o", unpacked_dir]
+        cmd = [webcrack_path, js_file, "-o", unpacked_dir, "--no-deobfuscate"]
     else:
         npx_path = "/home/ahmed/.nix-profile/bin/npx"
-        cmd = [npx_path, "-y", "webcrack", js_file, "-o", unpacked_dir]
+        cmd = [
+            npx_path,
+            "-y",
+            "webcrack",
+            js_file,
+            "-o",
+            unpacked_dir,
+            "--no-deobfuscate",
+        ]
 
     rc, stdout, stderr = await run_command(cmd)
-
-    # If webcrack fails due to isolated-vm or native issues, retry without deobfuscation
-    if rc != 0 and (
-        "isolated_vm" in stderr or "MODULE_NOT_FOUND" in stderr or "node-gyp" in stderr
-    ):
-        rlog(
-            f"webcrack full deobfuscation failed for {url} (native module issue), retrying without deobfuscation flag...",
-            level="warn",
-        )
-        if os.path.exists(unpacked_dir):
-            shutil.rmtree(unpacked_dir)
-
-        cmd.append("--no-deobfuscate")
-        rc, stdout, stderr = await run_command(cmd)
 
     if rc != 0:
         rlog(f"webcrack failed for {url}: {stderr}", level="error")
