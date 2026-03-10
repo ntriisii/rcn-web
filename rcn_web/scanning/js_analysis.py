@@ -262,16 +262,21 @@ async def process_js_file(
 
     # Nuclei
     nuclei_findings = await run_nuclei_js(url)
-    for nf in nuclei_findings:
-        all_findings.append(
-            {
-                "type": "nuclei",
-                "template": nf.get("template-id"),
-                "info": nf.get("info", {}).get("name"),
-                "matcher": nf.get("matcher-name"),
-                "extracted": nf.get("extracted-results"),
-            }
-        )
+    if nuclei_findings:
+        from .utils import handle_nuclei_scanning_entries
+
+        for nf in nuclei_findings:
+            all_findings.append(
+                {
+                    "type": "nuclei",
+                    "template": nf.get("template-id"),
+                    "info": nf.get("info", {}).get("name"),
+                    "matcher": nf.get("matcher-name"),
+                    "extracted": nf.get("extracted-results"),
+                }
+            )
+        # Store in the application vuln storage
+        await handle_nuclei_scanning_entries(nuclei_findings, source="js_pipeline")
 
     # Store results in js-intelligence
     js_intel = get_storage_create("web-apps::js-intelligence", parent_id=app["id"])
