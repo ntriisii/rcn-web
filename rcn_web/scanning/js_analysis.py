@@ -16,6 +16,7 @@ from rcn_web.core.utils import (
     web_match_storage,
     get_app_by_site,
     is_in_scope,
+    RemoteFlowsAdapter,
 )
 from rcn_core.decorators import rcn_event
 from rcn_core.storage.bases import add_annotation as global_add_annotation
@@ -130,8 +131,10 @@ async def handle_monitor_js_link(
     Handles the lifecycle of a single JS link within the monitor.
     Returns the inventory entry if analysis was triggered, else None.
     """
+
     if nuclei_findings is None:
         nuclei_findings = []
+
     url = js_link.get("url")
     if not url:
         return None
@@ -140,49 +143,31 @@ async def handle_monitor_js_link(
     source = js_link.get("source", "unknown")
     rlog(f"Evaluating JS link: {url} (source: {source}, app: {app.get('site')})")
 
-    if (
-        not url.endswith(".js")
-        and "javascript" not in js_link.get("response-ctype", "").lower()
-    ):
-        # Sometimes URLs don't end in .js but are JS
-        return None
-
-    # Only analyze if the domain is in scope
-    domain = urlparse(url).netloc
-    if not is_in_scope(domain):
-        rlog(f"JS link out of scope: {url} (domain: {domain})")
-        return None
-
     async with semaphore:
         try:
-            # Try to fetch content directly first since it's more reliable
-            # We want the content for Semgrep/jsluice regardless of jxscout status
             content = None
-            try:
-                async with session.get(url, timeout=20) as direct_resp:
-                    if direct_resp.status == 200:
-                        content = await direct_resp.text()
-                        rlog(
-                            f"Direct fetch successful for {url} ({len(content)} bytes)"
-                        )
-            except Exception as de:
-                rlog(f"Direct fetch failed for {url}: {de}", level="warn")
+            flow_id = js_link.get("flow-id")
 
-            # Now try to "ping" jxscout via proxy so it records the traffic
-            # We don't necessarily need the return value if we already have content
-            proxy = "http://localhost:3333"
-            try:
-                async with session.get(url, proxy=proxy, timeout=10) as jx_resp:
-                    if jx_resp.status == 200 and not content:
-                        content = await jx_resp.text()
-                        rlog(f"Fetch via jxscout proxy successful for {url}")
-                    elif jx_resp.status != 200:
-                        rlog(
-                            f"jxscout proxy returned {jx_resp.status} for {url}",
-                            level="debug",
-                        )
-            except Exception as je:
-                rlog(f"jxscout proxy connection failed for {url}: {je}", level="debug")
+            # Try to fetch content from the flows adapter first
+            if flow_id:
+                adapter = RemoteFlowsAdapter.get_instance()
+                flows = await adapter.get_flows_by_id([flow_id])
+                if flows:
+                    content = flows[0].get("response-body")
+                    if content:
+                        rlog(f"Retrieved content for {url} from flow {flow_id}")
+
+            if not content:
+                # Fallback to direct fetch if not found in proxy or flow-id missing
+                try:
+                    async with session.get(url, timeout=20) as direct_resp:
+                        if direct_resp.status == 200:
+                            content = await direct_resp.text()
+                            rlog(
+                                f"Direct fetch successful for {url} ({len(content)} bytes)"
+                            )
+                except Exception as de:
+                    rlog(f"Direct fetch failed for {url}: {de}", level="warn")
 
             if not content:
                 rlog(
@@ -192,7 +177,6 @@ async def handle_monitor_js_link(
                 return None
 
             current_hash = await get_js_hash(content)
-
             js_inventory = get_storage_create(
                 "web-apps::js-inventory", parent_id=app["id"]
             )
