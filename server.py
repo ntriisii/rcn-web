@@ -52,12 +52,16 @@ async def request(flow: HTTPFlow):
     if flow.request.url == "http://localhost:8023/getScope":
         scope = {}
         # send the request to all the running services and parse that scope and send it
-        for target in TARGET_TO_PORT_MAPPING:
-            print("getting the freaking scope for target", target)
-            port = TARGET_TO_PORT_MAPPING[target]
-            scope[target] = requests.get(
-                "http://localhost:" + str(port) + "/getScope"
-            ).json()
+        async with httpx.AsyncClient() as client:
+            for target in TARGET_TO_PORT_MAPPING:
+                print("getting the freaking scope for target", target)
+                port = TARGET_TO_PORT_MAPPING[target]
+                try:
+                    resp = await client.get(f"http://localhost:{port}/getScope")
+                    if resp.status_code == 200:
+                        scope[target] = resp.json()
+                except Exception as e:
+                    print(f"Error getting scope for {target}: {e}")
 
         flow.response = http.Response.make(
             200, json.dumps(scope).encode("utf-8"), {"Content-Type": "application/json"}
@@ -67,6 +71,8 @@ async def request(flow: HTTPFlow):
 
     # collect the target name from the URL
     path_parts = flow.request.path.strip("/").split("/")
+    if not path_parts:
+        return
     target_name = path_parts[0]
 
     # Store the target name in metadata for websocket syncing
@@ -86,46 +92,51 @@ async def request(flow: HTTPFlow):
 
             return
 
-        python_path = (
-            (os.getenv("PYTHON_PATH") or "")
-            + ":"
-            + "~/programming-projects/python/rcn-web/"
-        )
-        python = os.path.expanduser(
-            "~/programming-projects/python/rcn-web/.venv/bin/python3"
-        )
-        proc = await asyncio.subprocess.create_subprocess_exec(
+        python_root = os.path.expanduser("~/programming-projects/python/rcn-web/")
+        python_path = (os.getenv("PYTHONPATH") or "") + ":" + python_root
+        python = os.path.join(python_root, ".venv/bin/python3")
+
+        print(f"Starting rcn_web for {target_name} on port {cport}...")
+        proc = await asyncio.create_subprocess_exec(
             python,
             "-m",
-            "rcn_server",
+            "rcn_web",
             recon_dir_path,
             "--port",
             str(cport),
-            env={"PYTHON_PATH": python_path},
+            env={**os.environ, "PYTHONPATH": python_path},
         )
-        started = False
-        while not started:
-            try:
-                requests.get("http://localhost:" + str(cport))
-                started = True
-            except:
-                continue
-            time.sleep(0.3)
 
-        # proc = asyncio.subprocess.create_subprocess_exec([sys.executable, "-m", "rcn_server", recon_dir_path, "--port", str(cport)])
+        started = False
+        async with httpx.AsyncClient() as client:
+            for _ in range(20):  # Try for 10 seconds
+                try:
+                    # Use a very short timeout for the health check
+                    resp = await client.get(f"http://localhost:{cport}", timeout=0.5)
+                    if resp.status_code < 500:  # Any response is usually enough
+                        started = True
+                        break
+                except (httpx.ConnectError, httpx.TimeoutException):
+                    await asyncio.sleep(0.5)
+                    continue
+
+        if not started:
+            print(f"Failed to start rcn_web for {target_name}")
+            flow.response = http.Response.make(
+                500,
+                b'{"error": "Failed to start downstream service"}',
+                {"Content-Type": "application/json"},
+            )
+            return
 
         RUNNING_PROCESSES.append(proc)
         TARGET_TO_PORT_MAPPING[target_name] = cport
-
         CURRENT_PORT += 1
 
     flow.request.host = "localhost"
     flow.request.port = TARGET_TO_PORT_MAPPING[target_name]
     new_path = "/" + "/".join(path_parts[1:])
     flow.request.path = new_path
-
-
-# 4. Make the request to the downstream service
 
 
 async def websocket_start(flow: HTTPFlow):
@@ -140,6 +151,19 @@ async def websocket_end(flow: HTTPFlow):
     if target_name and target_name in TARGET_WS_CLIENTS:
         TARGET_WS_CLIENTS[target_name].discard(flow)
         print(f"Websocket client disconnected for target: {target_name}")
+
+
+def done():
+    """
+    Cleanup child processes when mitmproxy shuts down.
+    """
+    global RUNNING_PROCESSES
+    print("Mitmproxy shutting down, killing child processes...")
+    for proc in RUNNING_PROCESSES:
+        try:
+            proc.terminate()
+        except Exception as e:
+            print(f"Error terminating process: {e}")
 
 
 async def websocket_message(flow: HTTPFlow):
