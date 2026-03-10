@@ -20,7 +20,7 @@ async def websocket_connect(websocket: WebSocket, target_name: Optional[str] = N
     await conn.ws_connect("emacs-proxy", conn_id, websocket)
 
     try:
-        update_ws_obj: "ProxyWebSocket" = conn.get_ws()
+        update_ws_obj: "ProxyWebSocket" = conn.get_ws(conn_id)
 
         while True:
             data = await websocket.receive_json()
@@ -28,5 +28,5 @@ async def websocket_connect(websocket: WebSocket, target_name: Optional[str] = N
 
     except WebSocketDisconnect:
         print("------------------------")
-        print("The freaking socket disconnected")
+        print(f"The freaking socket disconnected for target: {target_name}")
         print("------------------------")
