@@ -238,7 +238,7 @@ async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
             return True
         rlog(
             f"jxscout already running on port {port} (Project: {_CURRENT_JXSCOUT_PROJECT}, Scope: {_CURRENT_JXSCOUT_SCOPE}). Requested (Project: {project_name}, Scope: {scope})",
-            level="warning",
+            level="warn",
         )
         # If project or scope changed, we should probably restart, but let's see if it works without it first
         # to avoid race conditions between different apps.

@@ -139,7 +139,7 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
                 if dresp.status != 200:
                     rlog(
                         "Warning: jxscout debug endpoint not responding correctly",
-                        level="warning",
+                        level="warn",
                     )
 
             # Use a short timeout for the monitor fetch
