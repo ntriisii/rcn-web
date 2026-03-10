@@ -81,9 +81,37 @@ async def js_intelligence_monitor(event, scheduled_md):
                 scope = f"*{app.get('site')}*"
                 await start_jxscout(project_name, scope=scope)
 
+                # Batch Nuclei Scan for all links in this batch for this app
+                app_urls = [l["url"] for l in data["links"] if l.get("url")]
+                rlog(
+                    f"Running batch Nuclei scan for {len(app_urls)} URLs in {app.get('site')}"
+                )
+                batch_findings = await run_nuclei_js(app_urls)
+
+                # Store findings in vuln storage
+                if batch_findings:
+                    from .utils import handle_nuclei_scanning_entries
+
+                    await handle_nuclei_scanning_entries(
+                        batch_findings, source="js_pipeline"
+                    )
+
+                # Group findings by URL for individual processing
+                url_nuclei_map = {}
+                for nf in batch_findings:
+                    found_url = nf.get("matched-at") or nf.get("url")
+                    if found_url not in url_nuclei_map:
+                        url_nuclei_map[found_url] = []
+                    url_nuclei_map[found_url].append(nf)
+
                 links_tasks = [
                     handle_monitor_js_link(
-                        session, semaphore, app, js_link, project_name
+                        session,
+                        semaphore,
+                        app,
+                        js_link,
+                        project_name,
+                        nuclei_findings=url_nuclei_map.get(js_link.get("url"), []),
                     )
                     for js_link in data["links"]
                 ]
@@ -100,11 +128,15 @@ async def js_intelligence_monitor(event, scheduled_md):
                     js_inventory.add_many(inventory_entries, source="js_monitor")
 
 
-async def handle_monitor_js_link(session, semaphore, app, js_link, project_name):
+async def handle_monitor_js_link(
+    session, semaphore, app, js_link, project_name, nuclei_findings=None
+):
     """
     Handles the lifecycle of a single JS link within the monitor.
     Returns the inventory entry if analysis was triggered, else None.
     """
+    if nuclei_findings is None:
+        nuclei_findings = []
     url = js_link.get("url")
     if not url:
         return None
@@ -188,7 +220,9 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
                 }
 
                 # Trigger Analysis Pipeline
-                await process_js_file(app, url, content, current_hash, project_name)
+                await process_js_file(
+                    app, url, content, current_hash, project_name, nuclei_findings
+                )
                 return inventory_entry
 
         except Exception as e:
@@ -198,11 +232,13 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
 
 
 async def process_js_file(
-    app, url, content, content_hash, project_name="default_target"
+    app, url, content, content_hash, project_name="default_target", nuclei_findings=None
 ):
     """
     Core pipeline for a single JS file.
     """
+    if nuclei_findings is None:
+        nuclei_findings = []
     rlog(f"Processing JS file: {url}")
 
     # 1. Recovery/Deobfuscation
@@ -260,23 +296,17 @@ async def process_js_file(
     if pp_result:
         all_findings.append({"type": "ppmap", "evidence": pp_result})
 
-    # Nuclei
-    nuclei_findings = await run_nuclei_js(url)
-    if nuclei_findings:
-        from .utils import handle_nuclei_scanning_entries
-
-        for nf in nuclei_findings:
-            all_findings.append(
-                {
-                    "type": "nuclei",
-                    "template": nf.get("template-id"),
-                    "info": nf.get("info", {}).get("name"),
-                    "matcher": nf.get("matcher-name"),
-                    "extracted": nf.get("extracted-results"),
-                }
-            )
-        # Store in the application vuln storage
-        await handle_nuclei_scanning_entries(nuclei_findings, source="js_pipeline")
+    # Nuclei Findings (passed from batch scan)
+    for nf in nuclei_findings:
+        all_findings.append(
+            {
+                "type": "nuclei",
+                "template": nf.get("template-id"),
+                "info": nf.get("info", {}).get("name"),
+                "matcher": nf.get("matcher-name"),
+                "extracted": nf.get("extracted-results"),
+            }
+        )
 
     # Store results in js-intelligence
     js_intel = get_storage_create("web-apps::js-intelligence", parent_id=app["id"])

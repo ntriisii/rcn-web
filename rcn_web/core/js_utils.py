@@ -303,32 +303,54 @@ async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
         return False
 
 
-async def run_nuclei_js(url: str):
+async def run_nuclei_js(urls: list[str]):
     """
-    Runs nuclei on a JS URL with specific security templates.
+    Runs nuclei on a list of JS URLs with specific security templates.
     """
+    if not urls:
+        return []
     nuclei_path = "/home/ahmed/.local/bin/nuclei"
     if not os.path.exists(nuclei_path):
         return []
 
-    rc, stdout, stderr = await run_command(
-        [
+    # Create a temporary file for the targets if there are many
+    if len(urls) > 1:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
+            tf.write("\n".join(urls))
+            target_file = tf.name
+
+        cmd = [
+            nuclei_path,
+            "-it",
+            "xss,prototype-pollution,postmessage,exposure,token,secret",
+            "-l",
+            target_file,
+            "-jsonl",
+        ]
+    else:
+        target_file = None
+        cmd = [
             nuclei_path,
             "-it",
             "xss,prototype-pollution,postmessage,exposure,token,secret",
             "-u",
-            url,
+            urls[0],
             "-jsonl",
         ]
-    )
-    findings = []
-    if rc == 0:
-        for line in stdout.splitlines():
-            try:
-                findings.append(json.loads(line))
-            except:
-                pass
-    return findings
+
+    try:
+        rc, stdout, stderr = await run_command(cmd)
+        findings = []
+        if rc == 0:
+            for line in stdout.splitlines():
+                try:
+                    findings.append(json.loads(line))
+                except:
+                    pass
+        return findings
+    finally:
+        if target_file and os.path.exists(target_file):
+            os.remove(target_file)
 
 
 def get_jxscout_path(project_name: str):
