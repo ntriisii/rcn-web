@@ -48,8 +48,6 @@ async def js_intelligence_monitor(event, scheduled_md):
         async with aiohttp.ClientSession() as session:
             for app_id, data in app_js_map.items():
                 app = data["app"]
-                rlog(f"Monitoring JS hashes for {app.get('site')}")
-
                 links_tasks = [
                     handle_monitor_js_hash(session, semaphore, app, js_link)
                     for js_link in data["links"]
@@ -114,6 +112,7 @@ async def handle_monitor_js_hash(session, semaphore, app, js_link):
                 return {
                     "url": url,
                     "hash": current_hash,
+                    "flow-id": flow_id,
                     "last_seen": time.time(),
                     "is_third_party": is_third_party(url, content),
                     "status": "monitored",
