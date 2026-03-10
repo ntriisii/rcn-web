@@ -251,7 +251,23 @@ async def process_js_file(
     asset_path = os.path.join(jx_path, "assets", domain)
     rlog(f"Checking for jxscout assets at {asset_path}")
     if os.path.exists(asset_path):
-        rlog(f"Found jxscout assets for {domain}, scanning...")
+        jx_assets = []
+        for root, _, files in os.walk(asset_path):
+            for f in files:
+                jx_assets.append(os.path.relpath(os.path.join(root, f), asset_path))
+
+        rlog(f"Found {len(jx_assets)} jxscout assets for {domain}: {jx_assets[:10]}...")
+
+        if jx_assets:
+            # Sample one asset content
+            try:
+                sample_asset = os.path.join(asset_path, jx_assets[0])
+                async with aiof.open(sample_asset, "r") as f:
+                    asset_content = await f.read()
+                rlog(f"jxscout asset sample ({jx_assets[0]}): {asset_content[:200]}...")
+            except:
+                pass
+
         # Scan jxscout recovered sources too
         jx_semgrep = await run_semgrep(asset_path)
         for f in jx_semgrep:

@@ -49,16 +49,24 @@ async def deobfuscate_js(js_content: str, url: str):
     # 1. Try Synchrony first (it's more stable on modern Node)
     if os.path.exists(synchrony_path):
         sync_out = os.path.join(tmp_dir, "sync_deobf.js")
+        rlog(f"Running synchrony on {url}...")
         rc, stdout, stderr = await run_command(
             [synchrony_path, "deobfuscate", js_file, "-o", sync_out]
         )
         if rc == 0 and os.path.exists(sync_out):
-            rlog(f"Synchrony successfully deobfuscated {url}")
+            async with aiof.open(sync_out, "r") as f:
+                sync_content = await f.read()
+            rlog(
+                f"Synchrony successfully deobfuscated {url}. Sample: {sync_content[:200]}..."
+            )
             # Use the deobfuscated file as input for webcrack (unpacking)
             js_file = sync_out
+        else:
+            rlog(f"Synchrony failed for {url}: {stderr}", level="debug")
 
     # 2. Use webcrack for unpacking/unminifying
     # Since isolated-vm is broken in this env, we default to --no-deobfuscate to avoid noise
+    rlog(f"Running webcrack on {url}...")
     if os.path.exists(webcrack_path):
         cmd = [webcrack_path, js_file, "-o", unpacked_dir, "--no-deobfuscate"]
     else:
@@ -74,6 +82,18 @@ async def deobfuscate_js(js_content: str, url: str):
         ]
 
     rc, stdout, stderr = await run_command(cmd)
+
+    if rc == 0 and os.path.exists(unpacked_dir):
+        # Log some info about unpacked files
+        unpacked_files = []
+        for root, _, files in os.walk(unpacked_dir):
+            for f in files:
+                unpacked_files.append(
+                    os.path.relpath(os.path.join(root, f), unpacked_dir)
+                )
+        rlog(
+            f"Webcrack unpacked {len(unpacked_files)} files for {url}: {unpacked_files[:10]}..."
+        )
 
     if rc != 0:
         rlog(f"webcrack failed for {url}: {stderr}", level="error")
