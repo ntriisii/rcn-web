@@ -1,3 +1,4 @@
+from rcn_web.storage.utils import get_uniq_apps
 import os
 import asyncio
 import aiohttp
@@ -39,8 +40,8 @@ async def js_intelligence_monitor(event, scheduled_md):
     Monitors web-apps::js-links for new JS files,
     tracks their hashes, and triggers analysis on change.
     """
-    scanner_name = event["name"]
 
+    scanner_name = event["name"]
     async with get_unprocessed_entries(
         scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
@@ -52,6 +53,9 @@ async def js_intelligence_monitor(event, scheduled_md):
         for item in unscanned.values():
             app = item["parent"]
             target_name = item.get("target_name", "default_target")
+            rlog(
+                f"Processing unscanned item for app {app.get('site')} in target {target_name}"
+            )
 
             if app["id"] not in app_js_map:
                 app_js_map[app["id"]] = {
@@ -68,9 +72,14 @@ async def js_intelligence_monitor(event, scheduled_md):
             for app_id, data in app_js_map.items():
                 app = data["app"]
                 project_name = data["target_name"]
+                rlog(
+                    f"Monitoring JS for app {app.get('site')} in project {project_name}"
+                )
 
                 # Ensure jxscout is running for this target
-                await start_jxscout(project_name)
+                # Include the app site in the scope to ensure jxscout handles it
+                scope = f"*{app.get('site')}*"
+                await start_jxscout(project_name, scope=scope)
 
                 links_tasks = [
                     handle_monitor_js_link(
@@ -97,26 +106,77 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
     Returns the inventory entry if analysis was triggered, else None.
     """
     url = js_link.get("url")
-    if not url or not url.endswith(".js"):
+    if not url:
+        return None
+
+    # Debugging: Log the source of this link
+    source = js_link.get("source", "unknown")
+    rlog(f"Evaluating JS link: {url} (source: {source}, app: {app.get('site')})")
+
+    if (
+        not url.endswith(".js")
+        and "javascript" not in js_link.get("response-ctype", "").lower()
+    ):
+        # Sometimes URLs don't end in .js but are JS
         return None
 
     # Only analyze if the domain is in scope
     domain = urlparse(url).netloc
     if not is_in_scope(domain):
+        rlog(f"JS link out of scope: {url} (domain: {domain})")
         return None
 
     async with semaphore:
         try:
             # Route through jxscout proxy (default 3333) if running
             proxy = "http://localhost:3333"
+            rlog(f"Fetching JS via jxscout: {url} (proxy: {proxy})")
+
+            # Check if jxscout is alive
+            async with session.get(
+                f"http://localhost:3333/debug/vars", timeout=2
+            ) as dresp:
+                if dresp.status != 200:
+                    rlog(
+                        "Warning: jxscout debug endpoint not responding correctly",
+                        level="warning",
+                    )
 
             # Use a short timeout for the monitor fetch
             async with session.get(url, proxy=proxy, timeout=30) as resp:
+                rlog(
+                    f"jxscout proxy response for {url}: status={resp.status}, headers={dict(resp.headers)}"
+                )
                 if resp.status != 200:
+                    try:
+                        error_body = await resp.text()
+                        rlog(
+                            f"Failed to fetch {url} via jxscout. Status: {resp.status}. Body: {error_body}"
+                        )
+                    except:
+                        rlog(
+                            f"Failed to fetch {url} via jxscout. Status: {resp.status}"
+                        )
+
+                    # DEBUG: Try fetching without proxy to see if it's a proxy issue
+
+                    try:
+                        async with session.get(url, timeout=10) as direct_resp:
+                            rlog(
+                                f"Direct fetch (no proxy) for {url}: status={direct_resp.status}"
+                            )
+                    except Exception as de:
+                        rlog(f"Direct fetch failed for {url}: {de}")
+
                     return None
+
                 content = await resp.text()
+                rlog(
+                    f"Successfully fetched {len(content)} bytes for {url}. Content start: {content[:100]}"
+                )
 
             current_hash = await get_js_hash(content)
+
             js_inventory = get_storage_create(
                 "web-apps::js-inventory", parent_id=app["id"]
             )
@@ -144,6 +204,7 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
 
         except Exception as e:
             rlog(f"Error monitoring JS {url}: {e}", level="error")
+
     return None
 
 
@@ -180,7 +241,9 @@ async def process_js_file(
     jx_path = get_jxscout_path(project_name)
     domain = urlparse(url).netloc
     asset_path = os.path.join(jx_path, "assets", domain)
+    rlog(f"Checking for jxscout assets at {asset_path}")
     if os.path.exists(asset_path):
+        rlog(f"Found jxscout assets for {domain}, scanning...")
         # Scan jxscout recovered sources too
         jx_semgrep = await run_semgrep(asset_path)
         for f in jx_semgrep:

@@ -209,33 +209,61 @@ def is_third_party(url: str, js_content: str) -> bool:
     return False
 
 
+_CURRENT_JXSCOUT_PROJECT = None
+_CURRENT_JXSCOUT_SCOPE = None
+
+
 async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
     """
     Starts jxscout as a background process.
     """
-    jxscout_path = "/home/ahmed/go/bin/jxscout"
+    global _CURRENT_JXSCOUT_PROJECT, _CURRENT_JXSCOUT_SCOPE
+    jxscout_path = "/home/ahmed/.local/bin/jxscout"
     if not os.path.exists(jxscout_path):
         rlog(f"jxscout binary not found at {jxscout_path}", level="error")
         return False
 
-    cmd = [jxscout_path, "-port", str(port), "-project-name", project_name]
+    # Check if already running on that port
+    import socket
+
+    is_running = False
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(("localhost", port)) == 0:
+            is_running = True
+
+    # If running with different project or scope, we might need to restart it
+    # For now, we just log it. In a real scenario we might want to kill the old process.
+    if is_running:
+        if _CURRENT_JXSCOUT_PROJECT == project_name and _CURRENT_JXSCOUT_SCOPE == scope:
+            return True
+        rlog(
+            f"jxscout already running on port {port} (Project: {_CURRENT_JXSCOUT_PROJECT}, Scope: {_CURRENT_JXSCOUT_SCOPE}). Requested (Project: {project_name}, Scope: {scope})",
+            level="warning",
+        )
+        # If project or scope changed, we should probably restart, but let's see if it works without it first
+        # to avoid race conditions between different apps.
+        return True
+
+    cmd = [jxscout_path, "-port", str(port), "-project-name", project_name, "-debug"]
     if scope:
         cmd.extend(["-scope", scope])
 
+    log_path = os.path.expanduser(f"~/jxscout/{project_name}/jxscout.log")
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
     try:
-        # Check if already running on that port
-        import socket
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("localhost", port)) == 0:
-                # rlog(f"jxscout already running on port {port}")
-                return True
-
+        # Use a log file instead of DEVNULL for debugging
+        log_file = open(log_path, "a")
         process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+            *cmd, stdout=log_file, stderr=log_file
         )
-        rlog(f"Started jxscout for project {project_name} on port {port}")
+        rlog(
+            f"Started jxscout for project {project_name} on port {port}. Logs: {log_path}"
+        )
+        _CURRENT_JXSCOUT_PROJECT = project_name
+        _CURRENT_JXSCOUT_SCOPE = scope
         # Wait for it to spin up
+
         await asyncio.sleep(2)
         return True
     except Exception as e:
