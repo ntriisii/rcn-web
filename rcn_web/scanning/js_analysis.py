@@ -128,52 +128,41 @@ async def handle_monitor_js_link(session, semaphore, app, js_link, project_name)
 
     async with semaphore:
         try:
-            # Route through jxscout proxy (default 3333) if running
+            # Try to fetch content directly first since it's more reliable
+            # We want the content for Semgrep/jsluice regardless of jxscout status
+            content = None
+            try:
+                async with session.get(url, timeout=20) as direct_resp:
+                    if direct_resp.status == 200:
+                        content = await direct_resp.text()
+                        rlog(
+                            f"Direct fetch successful for {url} ({len(content)} bytes)"
+                        )
+            except Exception as de:
+                rlog(f"Direct fetch failed for {url}: {de}", level="warn")
+
+            # Now try to "ping" jxscout via proxy so it records the traffic
+            # We don't necessarily need the return value if we already have content
             proxy = "http://localhost:3333"
-            rlog(f"Fetching JS via jxscout: {url} (proxy: {proxy})")
-
-            # Check if jxscout is alive
-            async with session.get(
-                f"http://localhost:3333/debug/vars", timeout=2
-            ) as dresp:
-                if dresp.status != 200:
-                    rlog(
-                        "Warning: jxscout debug endpoint not responding correctly",
-                        level="warn",
-                    )
-
-            # Use a short timeout for the monitor fetch
-            async with session.get(url, proxy=proxy, timeout=30) as resp:
-                rlog(
-                    f"jxscout proxy response for {url}: status={resp.status}, headers={dict(resp.headers)}"
-                )
-                if resp.status != 200:
-                    try:
-                        error_body = await resp.text()
+            try:
+                async with session.get(url, proxy=proxy, timeout=10) as jx_resp:
+                    if jx_resp.status == 200 and not content:
+                        content = await jx_resp.text()
+                        rlog(f"Fetch via jxscout proxy successful for {url}")
+                    elif jx_resp.status != 200:
                         rlog(
-                            f"Failed to fetch {url} via jxscout. Status: {resp.status}. Body: {error_body}"
+                            f"jxscout proxy returned {jx_resp.status} for {url}",
+                            level="debug",
                         )
-                    except:
-                        rlog(
-                            f"Failed to fetch {url} via jxscout. Status: {resp.status}"
-                        )
+            except Exception as je:
+                rlog(f"jxscout proxy connection failed for {url}: {je}", level="debug")
 
-                    # DEBUG: Try fetching without proxy to see if it's a proxy issue
-
-                    try:
-                        async with session.get(url, timeout=10) as direct_resp:
-                            rlog(
-                                f"Direct fetch (no proxy) for {url}: status={direct_resp.status}"
-                            )
-                    except Exception as de:
-                        rlog(f"Direct fetch failed for {url}: {de}")
-
-                    return None
-
-                content = await resp.text()
+            if not content:
                 rlog(
-                    f"Successfully fetched {len(content)} bytes for {url}. Content start: {content[:100]}"
+                    f"Could not retrieve content for {url} via any method",
+                    level="error",
                 )
+                return None
 
             current_hash = await get_js_hash(content)
 

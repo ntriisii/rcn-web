@@ -251,11 +251,18 @@ async def start_jxscout(project_name: str, scope: str = None, port: int = 3333):
     log_path = os.path.expanduser(f"~/jxscout/{project_name}/jxscout.log")
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
+    env = os.environ.copy()
+    env["TERM"] = "dumb"  # Try to disable TUI
+
     try:
         # Use a log file instead of DEVNULL for debugging
         log_file = open(log_path, "a")
         process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=log_file, stderr=log_file
+            *cmd,
+            stdout=log_file,
+            stderr=log_file,
+            stdin=asyncio.subprocess.DEVNULL,
+            env=env,
         )
         rlog(
             f"Started jxscout for project {project_name} on port {port}. Logs: {log_path}"
