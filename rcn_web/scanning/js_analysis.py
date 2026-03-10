@@ -2,8 +2,6 @@ from rcn_web.storage.utils import get_uniq_apps
 import os
 import asyncio
 import aiohttp
-import aiofiles as aiof
-import json
 import time
 from urllib.parse import urlparse
 
@@ -14,34 +12,23 @@ from rcn_core.data_access import (
 )
 from rcn_web.core.utils import (
     web_match_storage,
-    get_app_by_site,
     is_in_scope,
     RemoteFlowsAdapter,
 )
 from rcn_core.decorators import rcn_event
-from rcn_core.storage.bases import add_annotation as global_add_annotation
 from rcn_core.log import rlog
 
 from rcn_web.core.js_utils import (
     get_js_hash,
-    deobfuscate_js,
-    run_semgrep,
-    run_jsluice,
-    run_ppmap,
     is_third_party,
-    start_jxscout,
-    run_nuclei_js,
-    get_jxscout_path,
 )
 
 
 @rcn_event()
 async def js_intelligence_monitor(event, scheduled_md):
     """
-    Monitors web-apps::js-links for new JS files,
-    tracks their hashes, and triggers analysis on change.
+    Simplified monitor: tracks JS file hashes only.
     """
-
     scanner_name = event["name"]
     async with get_unprocessed_entries(
         scanner_name, event, match_storage_fn=web_match_storage
@@ -49,14 +36,108 @@ async def js_intelligence_monitor(event, scheduled_md):
         if not unscanned:
             return
 
-        # Group by app to optimize
+        # Group by app
         app_js_map = {}
         for item in unscanned.values():
             app = item["parent"]
-            target_name = item.get("target_name", "default_target")
-            rlog(
-                f"Processing unscanned item for app {app.get('site')} in target {target_name}"
+            if app["id"] not in app_js_map:
+                app_js_map[app["id"]] = {"app": app, "links": []}
+            app_js_map[app["id"]]["links"].append(item["entry"])
+
+        semaphore = asyncio.Semaphore(10)
+        async with aiohttp.ClientSession() as session:
+            for app_id, data in app_js_map.items():
+                app = data["app"]
+                rlog(f"Monitoring JS hashes for {app.get('site')}")
+
+                links_tasks = [
+                    handle_monitor_js_hash(session, semaphore, app, js_link)
+                    for js_link in data["links"]
+                ]
+                results = await asyncio.gather(*links_tasks)
+
+                inventory_entries = [r for r in results if r is not None]
+                if inventory_entries:
+                    js_inventory = get_storage_create(
+                        "web-apps::js-inventory", parent_id=app_id
+                    )
+                    js_inventory.add_many(inventory_entries, source="js_monitor")
+
+
+async def handle_monitor_js_hash(session, semaphore, app, js_link):
+    url = js_link.get("url")
+    if not url:
+        return None
+
+    # Only analyze if the domain is in scope
+    domain = urlparse(url).netloc
+    if not is_in_scope(domain):
+        return None
+
+    async with semaphore:
+        try:
+            content = None
+            flow_id = js_link.get("flow-id")
+
+            # Try to fetch content from the flows adapter first
+            if flow_id:
+                adapter = RemoteFlowsAdapter.get_instance()
+                flows = await adapter.get_flows_by_id([flow_id])
+                if flows:
+                    content = flows[0].get("response-body")
+
+            if not content:
+                try:
+                    async with session.get(url, timeout=15) as resp:
+                        if resp.status == 200:
+                            content = await resp.text()
+                except:
+                    pass
+
+            if not content:
+                return None
+
+            current_hash = await get_js_hash(content)
+            js_inventory = get_storage_create(
+                "web-apps::js-inventory", parent_id=app["id"]
             )
+
+            # Check inventory
+            existing = js_inventory.get_filtered(f"url = '{url}'")
+            is_changed = True
+            if existing:
+                if existing[0].get("hash") == current_hash:
+                    is_changed = False
+
+            if is_changed:
+                rlog(f"JS Hash changed for {url}")
+                return {
+                    "url": url,
+                    "hash": current_hash,
+                    "last_seen": time.time(),
+                    "is_third_party": is_third_party(url, content),
+                    "status": "monitored",
+                }
+
+        except Exception as e:
+            rlog(f"Error monitoring hash for {url}: {e}", level="debug")
+
+    return None
+
+
+async def process_js_file(app, url, content, content_hash, project_name="default_target"):
+    """
+    Legacy pipeline - currently disabled.
+    """
+    pass
+
+
+async def delegate_to_ai_js_analysis(app, url, file_paths, tool_findings):
+    """
+    Legacy AI delegation - currently disabled.
+    """
+    pass
+
 
             if app["id"] not in app_js_map:
                 app_js_map[app["id"]] = {
