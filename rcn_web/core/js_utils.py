@@ -44,20 +44,45 @@ async def deobfuscate_js(js_content: str, url: str):
 
     # Use installed webcrack if available, otherwise fallback to npx
     webcrack_path = os.path.expanduser("~/.npm-global/bin/webcrack")
+    beautify_path = os.path.expanduser("~/.npm-global/bin/js-beautify")
     unpacked_dir = os.path.join(tmp_dir, "unpacked")
 
+    # Try full webcrack first
     if os.path.exists(webcrack_path):
         cmd = [webcrack_path, js_file, "-o", unpacked_dir]
     else:
-        # Fallback to npx -y
         npx_path = "/home/ahmed/.nix-profile/bin/npx"
         cmd = [npx_path, "-y", "webcrack", js_file, "-o", unpacked_dir]
 
     rc, stdout, stderr = await run_command(cmd)
 
+    # If webcrack fails due to isolated-vm or native issues, retry without deobfuscation
+    if rc != 0 and (
+        "isolated_vm" in stderr or "MODULE_NOT_FOUND" in stderr or "node-gyp" in stderr
+    ):
+        rlog(
+            f"webcrack full deobfuscation failed for {url} (native module issue), retrying without deobfuscation flag...",
+            level="warn",
+        )
+        if os.path.exists(unpacked_dir):
+            shutil.rmtree(unpacked_dir)
+
+        cmd.append("--no-deobfuscate")
+        rc, stdout, stderr = await run_command(cmd)
+
     if rc != 0:
         rlog(f"webcrack failed for {url}: {stderr}", level="error")
-        # If it fails, we just have the input file
+
+        # Fallback to js-beautify if available
+        if os.path.exists(beautify_path):
+            rlog(f"Falling back to js-beautify for {url}", level="info")
+            os.makedirs(unpacked_dir, exist_ok=True)
+            output_file = os.path.join(unpacked_dir, "beautified.js")
+            beautify_cmd = [beautify_path, "-o", output_file, js_file]
+            brc, bstd, berr = await run_command(beautify_cmd)
+            if brc == 0:
+                return unpacked_dir, True
+
         return tmp_dir, False
 
     return unpacked_dir, True
