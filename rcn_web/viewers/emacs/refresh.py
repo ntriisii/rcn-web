@@ -4,9 +4,9 @@ import time
 from itertools import batched
 import ctypes
 
-from rcn_web.viewers.emacs.match_groups import filter_flows_by_groups
-from rcn_web.viewers.emacs.match_groups import mark_flows_by_groups
-from rcn_web.viewers.emacs.match_groups import highlight_flows_by_groups
+from pentest_utils.viewers.emacs.match_groups import filter_flows_by_groups
+from pentest_utils.viewers.emacs.match_groups import mark_flows_by_groups
+from pentest_utils.viewers.emacs.match_groups import highlight_flows_by_groups
 
 dlls = ctypes.CDLL("libc.so.6")
 
@@ -24,7 +24,6 @@ def get_refresh_content(
     view_id: "typing.Optional[str]" = None,
     force_reload=False,
 ):
-
     t0 = time.time()
 
     # include the manipulation code
