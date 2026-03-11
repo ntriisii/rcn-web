@@ -233,9 +233,9 @@ def make_preview_tabulated_entries(
                 ]
 
             # Apply Legacy Filtering (Python side)
-            # FIX: Use "filter-groups" instead of "mark-groups" for filtering
+            # Use None for match_fn so it uses AST/eval logic handled by "parent objects" (QueryNodes)
             resolved_batch = pu_mg._apply_highlight_logic_py(
-                resolved_batch, filter_groups, "filter-groups", match_fn
+                resolved_batch, filter_groups, "filter-groups", None
             )
             resolved_batch = list(filter(rm_flt, resolved_batch))
 
