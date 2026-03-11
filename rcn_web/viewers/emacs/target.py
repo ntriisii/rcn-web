@@ -10,7 +10,14 @@ import datetime
 import rcn_core.globals
 from rcn_web.viewers.emacs import refresh
 
-from .utils import *
+from pentest_utils.viewers.emacs.utils import (
+    make_org_link,
+    make_preview_tabulated_entries,
+    basic_match_fn,
+    elisp_make_org_headline,
+    read_notes_files,
+    NOTES_CONTENT,
+)
 from .ip import preview_ip_data
 from .dorks import arrange_dorks_view, arrange_dorks_preview
 from .dorks import arrange_google_dorks_views
@@ -24,9 +31,6 @@ from rcn_core.storage.bases import (
     get_storage_create,
     add_annotation as global_add_annotation,
 )
-
-from pentest_utils.viewers.emacs.utils import make_org_link
-from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
 
 # Cache for TODOs data with file modification times
 TODOS_CACHE = {}

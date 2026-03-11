@@ -1,7 +1,6 @@
 import sys
-from rcn_web.viewers.emacs.utils import (
+from pentest_utils.viewers.emacs.utils import (
     make_preview_tabulated_entries,
-    elisp_make_basic_storage_view,
 )
 
 
@@ -217,6 +216,8 @@ def js_links_preview_data(sto, page=0, reset_page_counter=False, match_groups=No
 def elisp_view_js_secrets(
     secret_storage, create_windows=False, match_groups=None, *args, **kwargs
 ):
+    from pentest_utils.viewers.emacs.utils import elisp_make_basic_storage_view
+
     return elisp_make_basic_storage_view(secret_storage, *args, **kwargs)
 
 

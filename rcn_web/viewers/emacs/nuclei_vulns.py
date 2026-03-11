@@ -1,5 +1,8 @@
 import sys
-from .utils import *
+from pentest_utils.viewers.emacs.utils import (
+    basic_match_fn,
+    make_preview_tabulated_entries,
+)
 
 
 def elisp_view_app_nuclei_scanning(

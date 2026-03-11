@@ -1,6 +1,9 @@
 import datetime
 
-from .utils import *
+from pentest_utils.viewers.emacs.utils import (
+    basic_match_fn,
+    make_preview_tabulated_entries,
+)
 from .nuclei_vulns import elisp_make_nuclei_vulns_tabulated_entries
 from pentest_utils.viewers.emacs.match_groups import (
     parse_rule_to_node,
