@@ -27,6 +27,10 @@ from rcn_core.storage.bases import (
 
 from pentest_utils.viewers.emacs.utils import make_org_link
 from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
+from pentest_utils.viewers.emacs.match_groups import (
+    parse_rule_to_node,
+    evaluate_query_node,
+)
 
 # Cache for TODOs data with file modification times
 TODOS_CACHE = {}
@@ -186,9 +190,19 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         match_groups = dict()
 
     def apps_match_fn(e, value):
-        app = e["obj"]
-        e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
-        return eval(value)
+        app = e.get("obj")
+        if app:
+            e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
+
+        # Ensure 'status' is available as an alias for 'status_code' for consistency
+        if "status_code" in e and "status" not in e:
+            e["status"] = e["status_code"]
+
+        try:
+            # Safe eval allowing standard types but no builtins
+            return bool(eval(value, {"__builtins__": {}}, e))
+        except Exception:
+            return False
 
     # read_notes_files()
 

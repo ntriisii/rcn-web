@@ -2,6 +2,10 @@ import datetime
 
 from .utils import *
 from .nuclei_vulns import elisp_make_nuclei_vulns_tabulated_entries
+from pentest_utils.viewers.emacs.match_groups import (
+    parse_rule_to_node,
+    evaluate_query_node,
+)
 
 from rcn_web.storage.url import *
 from rcn_core.storage.bases import BasicDataStorage
@@ -87,17 +91,16 @@ def elisp_view_app_found_sources_urls(
 
 def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
     def url_match_fn(e, value):
-        method = e["method"]
-        path = e["path"]
-        tags = e["tags"]
-        status = e["status"]
-        req_ctype = e["request-ctype"]
-        resp_ctype = e["response-ctype"]
-        forms = e["forms"]
-        time = e["timestamp"]
+        # Local context mapping for evaluation
+        ctx = e.copy()
+        # Ensure 'status_code' is available as an alias for 'status'
+        if "status" in ctx and "status_code" not in ctx:
+            ctx["status_code"] = ctx["status"]
 
-        ev = eval(value)
-        return ev
+        try:
+            return bool(eval(value, {"__builtins__": {}}, ctx))
+        except Exception:
+            return False
 
     content = url_storage.get()
     tabl_entries = dict()
@@ -122,6 +125,7 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
+        match_fn=url_match_fn,
         *args,
         **kwargs,
     )
