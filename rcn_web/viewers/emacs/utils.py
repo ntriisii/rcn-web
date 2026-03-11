@@ -23,6 +23,7 @@ from pentest_utils.viewers.emacs.utils import (
     highlight_flows_by_groups,
     mark_flows_by_groups,
     make_org_tree,
+    make_org_link,
 )
 from pentest_utils.storage.shared import QueryNode
 
