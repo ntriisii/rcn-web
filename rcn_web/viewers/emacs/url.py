@@ -97,8 +97,10 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
         if "status" in ctx and "status_code" not in ctx:
             ctx["status_code"] = ctx["status"]
 
+        # Support ~ as logical NOT for the user
+        processed_value = value.replace("~", "not ")
         try:
-            return bool(eval(value, {"__builtins__": {}}, ctx))
+            return bool(eval(processed_value, {"__builtins__": {}}, ctx))
         except Exception:
             return False
 

@@ -333,7 +333,7 @@ async def get_app(content: Request):
         if app_id:
             app = get_app_by_id(get_storage(), app_id)
         if not app and app_name:
-            app = get_app_by_id(get_storage(), app_name)
+            app = get_app_by_site(get_storage(), app_name)
 
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)

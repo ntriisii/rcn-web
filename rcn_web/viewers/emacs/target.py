@@ -198,9 +198,11 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         if "status_code" in e and "status" not in e:
             e["status"] = e["status_code"]
 
+        # Support ~ as logical NOT for the user
+        processed_value = value.replace("~", "not ")
         try:
             # Safe eval allowing standard types but no builtins
-            return bool(eval(value, {"__builtins__": {}}, e))
+            return bool(eval(processed_value, {"__builtins__": {}}, e))
         except Exception:
             return False
 
