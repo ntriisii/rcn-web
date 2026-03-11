@@ -1,7 +1,8 @@
+
 import sys
 import rcn_core.globals
 
-from rcn_core.utils import get_scope_wildcards
+from rcn_web.core.scope import get_scope_wildcards
 
 from pentest_utils.viewers.emacs.utils import make_org_link
 from pentest_utils.viewers.emacs.utils import elisp_make_org_headline

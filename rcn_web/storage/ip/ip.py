@@ -241,7 +241,7 @@ async def censys_scan_ips_scheduled(event, scheduled_md):
 
     censys_ips = get_storage_create("censys-ips")
     censys_ips.clear()
-    CENSYS_SEARCH_IPS.extend([i["ip"] for i in storage()["found-ips"].get()])
+    CENSYS_SEARCH_IPS.extend([i["ip"] for i in get_storage()["found-ips"].get()])
     CENSYS_SEARCH_IPS = list(set(CENSYS_SEARCH_IPS))
 
     for i in range(len(CENSYS_SEARCH_IPS)):

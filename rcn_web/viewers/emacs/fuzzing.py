@@ -5,7 +5,6 @@ from .utils import *
 def elisp_view_app_fuzzing(
     fz_st, create_windows=False, match_groups=None, *args, **kwargs
 ):
-
     collected = dict()
     tabulated_entries, tabulated_format = elisp_make_fuzzing_tabulated_entries(
         fuzzing_storage=fz_st, match_groups=match_groups, *args, **kwargs
@@ -34,20 +33,8 @@ def elisp_view_app_fuzzing(
                     "buffer-name": response_buf_name,
                 },
                 "window-2": {
-                    "window-config": {
-                        "window-1": {
-                            "mode": "fundamental-mode",
-                            "buffer-name": request_buf_name,
-                        },
-                        "window-2": {
-                            "mode": "vterm",
-                            "buffer-name": "vterm:url-interact",
-                            "no-create": True,
-                            "path": sys.argv[1],
-                        },
-                        "orientation": "horizontal",
-                        "scale": 0.45,
-                    }
+                    "mode": "fundamental-mode",
+                    "buffer-name": request_buf_name,
                 },
                 "orientation": "horizontal",
                 "scale": 0.3,
@@ -85,7 +72,6 @@ def fuzzing_preview_data(sto):
 def elisp_make_fuzzing_tabulated_entries(
     fuzzing_storage, match_groups, *args, **kwargs
 ):
-
     def url_match_fn(e, value):
         path = e["path"]
         status = e["status"]

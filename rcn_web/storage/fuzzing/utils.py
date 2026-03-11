@@ -1,7 +1,7 @@
 import datetime
 from urllib.parse import urlparse
 
-from rcn_web.core.utils import storage, get_app_by_site
+from rcn_web.core.utils import get_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create
 
 
@@ -9,7 +9,7 @@ async def handle_fuzzing_entries(content):
     if not content:
         return
     site = content[0]["host"]
-    st = storage()
+    st = get_storage()
     app = get_app_by_site(st, site)
     
     if not app:

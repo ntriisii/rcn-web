@@ -1,4 +1,3 @@
-
 import datetime
 
 from .utils import *
@@ -7,21 +6,26 @@ from .nuclei_vulns import elisp_make_nuclei_vulns_tabulated_entries
 from rcn_web.storage.url import *
 from rcn_core.storage.bases import BasicDataStorage
 
+
 def elisp_view_app_found_sources_urls(
-    url_storage:"BasicDataStorage", create_windows=False, match_groups=None, *args, **kwargs
+    url_storage: "BasicDataStorage",
+    create_windows=False,
+    match_groups=None,
+    *args,
+    **kwargs,
 ):
-    
     if not match_groups:
         match_groups = dict()
-    
+
+    print("the url storage length is ", url_storage)
     collected = dict()
     tabulated_entries, tabulated_format = elisp_make_sources_url_tabulated_entries(
         url_storage=url_storage, match_groups=match_groups, *args, **kwargs
     )
-    
+
     request_buf_name = "rcn-view-req-buffer"
     response_buf_name = "rcn-view-req-buffer-response"
-    
+
     url_tabl_window = {
         "buffer-name": "*app-links-entries*",
         "mode": "tabulated-list-mode",
@@ -42,7 +46,7 @@ def elisp_view_app_found_sources_urls(
         ],
         "buffer-store": {"parent_id": url_storage.parent_id},
     }
-    
+
     collected["window-config"] = {
         "window-1": url_tabl_window,
         "window-2": {
@@ -52,19 +56,8 @@ def elisp_view_app_found_sources_urls(
                     "buffer-name": request_buf_name,
                 },
                 "window-2": {
-                    "window-config": {
-                        "window-1": {
-                            "mode": "fundamental-mode",
-                            "buffer-name": response_buf_name,
-                        },
-                        "window-2": {
-                            "mode": "vterm",
-                            "buffer-name": "vterm:url-interact",
-                            "no-create": True,
-                            "path": sys.argv[1],
-                        },
-                        "orientation": "horizontal",
-                    }
+                    "mode": "fundamental-mode",
+                    "buffer-name": response_buf_name,
                 },
                 "orientation": "horizontal",
                 "scale": 0.3,
@@ -73,7 +66,7 @@ def elisp_view_app_found_sources_urls(
         "orientation": "vertical",
         "scale": 0.25,
     }
-    
+
     collected["view-store"] = {
         "web-apps::app-links": {
             "tabulated-data": {
@@ -85,13 +78,14 @@ def elisp_view_app_found_sources_urls(
         "default-directory": sys.argv[1],
         "parent-storage": "web-apps",
     }
-    
-    if create_windows: return collected
-    else: return collected["window-config"]["window-1"]["entries"]
+
+    if create_windows:
+        return collected
+    else:
+        return collected["window-config"]["window-1"]["entries"]
 
 
 def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
-    
     def url_match_fn(e, value):
         method = e["method"]
         path = e["path"]
@@ -101,17 +95,19 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
         resp_ctype = e["response-ctype"]
         forms = e["forms"]
         time = e["timestamp"]
-        
+
         ev = eval(value)
         return ev
-    
+
     content = url_storage.get()
     tabl_entries = dict()
-    
+
     # make the IDs
-    for i in content: tabl_entries[i["id"]] = i
-    if not content: return [], ""
-    
+    for i in content:
+        tabl_entries[i["id"]] = i
+    if not content:
+        return [], ""
+
     attrs = (
         ("id", 0),
         ("path", 75),
@@ -120,27 +116,26 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
         ("response-ctype", 7),
         ("title", 10),
     )
-    
+
     entries, fmt = make_preview_tabulated_entries(
         tabl_entries,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
         *args,
-        **kwargs
+        **kwargs,
     )
-    
+
     return entries, fmt
 
 
 def url_sources_preview_data(sto, page=0, reset_page_counter=False, match_groups=None):
-    
     if match_groups is None:
         match_groups = dict()
-    
+
     tr = dict()
-    
+
     data_length = len(sto)
     tr["Found URLs length "] = data_length
-    
+
     return tr

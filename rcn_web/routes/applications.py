@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 
 import rcn_core.globals
 
-from rcn_web.core.utils import storage
+from rcn_web.core.utils import get_storage
 from rcn_core.storage.target_storage import TargetStorage
 from rcn_web.storage.url.utils import add_gau_entries
 
@@ -43,7 +43,7 @@ async def add_gau_collected_data(request: Request) -> JSONResponse:
 #   app_name = content['application']
 
 #   # get the application
-#   st = storage()
+#   st = get_storage()
 #   app = get_app_by_site(st, app_name)
 
 #   if not app: app = get_app_by_site(st, app_name)
@@ -71,7 +71,7 @@ async def add_gau_collected_data(request: Request) -> JSONResponse:
 
 #   relative_file_path = re.sub(".*?/js/", "", file_path, 1)
 #   app_name = relative_file_path.split('/')[0]
-#   app = get_app_by_site(storage(), app_name)
+#   app = get_app_by_site(get_storage(), app_name)
 #   if not app:
 #     # TODO: error ??
 #     return
@@ -170,7 +170,7 @@ async def add_annotation(request: Request) -> JSONResponse:
     value = content.get("value")
     storage_name = content.get("storage", "web-apps::annotations")
 
-    app = get_app_by_site(storage(), site)
+    app = get_app_by_site(get_storage(), site)
     if not app:
         return JSONResponse({"added": False, "error": "App not found"}, status_code=404)
 
@@ -188,7 +188,7 @@ async def get_annotations(request: Request) -> JSONResponse:
     entry_id = content.get("entry_id")
     storage_name = content.get("storage", "web-apps::annotations")
 
-    app = get_app_by_site(storage(), site)
+    app = get_app_by_site(get_storage(), site)
     if not app:
         return JSONResponse({"annotations": [], "error": "App not found"}, status_code=404)
 
@@ -206,7 +206,7 @@ class AppPreviewRequest(BaseModel):
 @router.post("/preview_apps")
 async def preview_apps(request: AppPreviewRequest):
     from rcn_core.storage.bases import get_storage_create
-    st = storage()
+    st = get_storage()
     if not st:
         return JSONResponse("No storage loaded.", status_code=404)
     
@@ -215,7 +215,7 @@ async def preview_apps(request: AppPreviewRequest):
         found = None
         # Try finding by ID first
         if isinstance(ident, int) or (isinstance(ident, str) and ident.isdigit()):
-             found = next((a for a in get_uniq_apps(s)t) if str(a['id']) == str(ident)), None)
+             found = next((a for a in get_uniq_apps(s) if str(a['id']) == str(ident)), None)
         
         # If not found or not ID, try by site
         if not found and isinstance(ident, str):
@@ -232,7 +232,7 @@ async def preview_apps(request: AppPreviewRequest):
         ai_payload += f"APP ID: {app['id']}\n"
         # Manual text view since Entry is removed
         for k, v in app.items():
-            if k not in ["id", "timestamp", "application_id", "parent_id"]:
+            if k not in ["id", "timestamp", "parent_id"]:
                 ai_payload += f"{k}: {v}\n"
         
         ai_payload += "\n\nApplication Annotations:\n"

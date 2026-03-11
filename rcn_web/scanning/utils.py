@@ -1,4 +1,3 @@
-
 import os
 import re
 import jq
@@ -20,19 +19,21 @@ from contextlib import asynccontextmanager
 
 import rcn_core.globals as cglobals
 
-from rcn_core.data_access import storage, rr_server_hosts_stats
-from rcn_web.core.utils import rr_server_remote_hosts_count
+from rcn_core.data_access import (
+    get_storage,
+    rr_server_hosts_stats,
+    rr_server_remote_hosts_count,
+)
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
-from rcn_core.utils import yaml_fn_to_py
-from rcn_core.data_access import storage
+from rcn_core.data_access import get_storage
 from rcn_web.config import *
-from rcn_web.core.utils import parse_json, web_match_storage, get_app_by_site
+from rcn_web.core.utils import web_match_storage, get_app_by_site
+from rcn_core.utils import parse_json
 
 # from rcn_web.storage.url import handle_crawling_collected_urls
 from rcn_core.data_access import get_unprocessed_entries
-
-
+from rcn_core.decorators import rcn_event
 
 
 def parse_ffuf_content(content):
@@ -86,7 +87,7 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
 
         found_apps[site].append(entry)
 
-    s = storage()
+    s = get_storage()
     for site in found_apps:
         app = get_app_by_site(s, site)
         data = found_apps[site]
@@ -97,7 +98,9 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
             continue
 
         # store in the app scanning data only if the target path is /
-        nc_storage = get_storage_create("web-apps::nuclei-scanning", parent_id=app['id'])
+        nc_storage = get_storage_create(
+            "web-apps::nuclei-scanning", parent_id=app["id"]
+        )
         site_vuln_ids = [i["template-id"] for i in nc_storage.get()]
         for entry in data:
             host, path = get_nuclei_host_and_path(entry["host"])
@@ -107,29 +110,45 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
                 site_vuln_ids.append(entry["template-id"])
 
 
+@rcn_event()
 async def crawl_application(event, scheduled_md):
     kt_additional_args = event.get("katana-args", "")
     scanner_name = event["name"]
-    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
+    async with get_unprocessed_entries(
+        scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
         apps = [i["entry"] for i in unscanned.values()]
 
         if apps:
             apps_links = [app["url"] for app in apps]
-            async with aiof.open("/tmp/to_crawl_apps.txt", "w") as f:
+
+            target_tmp_dir = os.path.join(cglobals.TARGET_DIR, "tmp")
+            if not os.path.exists(target_tmp_dir):
+                os.makedirs(target_tmp_dir)
+
+            tmp_file_path = os.path.join(target_tmp_dir, "to_crawl_apps.txt")
+
+            async with aiof.open(tmp_file_path, "w") as f:
                 await f.write("\n".join(apps_links))
 
+            print()
             # TODO: don't use proxy and create a flow that can translate to a piped operation
             # to handle application data and what you want from it.
             from rcn_core.time_event import start_scheduled_process
-            await start_scheduled_process(
-                f"rr katana -u /tmp/to_crawl_apps.txt {kt_additional_args} ---chunks-per-host 1 -ob -jc -jsl -silent -aff -fx -j -proxy http://localhost:8081 -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -kf all -xhr ---debug | jq -c 'del(.response.body) | del(.response.raw)' ",
-                timeout=event.get("timeout"),
-                debug=event.get("debug"),
-                name=event.get("name"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
             
+            try:
+                await start_scheduled_process(
+                    f"rr katana -u {tmp_file_path} {kt_additional_args} ---chunks-per-host 1 -ob -jc -jsl -silent -aff -fx -j -proxy http://localhost:8081 -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -kf all -xhr -timeout 20 | jq -c 'del(.response.body) | del(.response.raw)' ",
+                    timeout=event.get("timeout"),
+                    debug=event.get("debug"),
+                    name=event.get("name"),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+            finally:
+                if os.path.exists(tmp_file_path):
+                    os.remove(tmp_file_path)
+
             # print(results)
             # print(results.split('\n')[:10])
             # TODO: make sure all data from katana are included in the proxy
@@ -137,10 +156,13 @@ async def crawl_application(event, scheduled_md):
             # await handle_crawling_collected_urls(parse_json(results.split('\n')))
 
 
-async def run_nuclei_scan(targets_file_path, templates_path, nuclei_args, timeout=None, debug=False, name=""):
+async def run_nuclei_scan(
+    targets_file_path, templates_path, nuclei_args, timeout=None, debug=False, name=""
+):
     cmd = f"rr nuclei -l {targets_file_path}:l1 -t {templates_path} {nuclei_args} -duc "
-    
+
     from rcn_core.time_event import start_scheduled_process
+
     results = await start_scheduled_process(
         cmd,
         timeout=timeout,
@@ -150,16 +172,19 @@ async def run_nuclei_scan(targets_file_path, templates_path, nuclei_args, timeou
         stderr=subprocess.DEVNULL,
         shell=True,
     )
-    
+
     return results
 
 
+@rcn_event()
 async def nuclei_scan_apps(event, scheduled_md, matched_storage=[]):
     fn_name = event["name"]
     timeout = event.get("timeout")
     debug = event.get("debug")
     scanner_name = fn_name
-    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
+    async with get_unprocessed_entries(
+        scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
         apps = [i["entry"] for i in unscanned.values()]
         if apps:
             async with aiof.open("/tmp/nuclei_c_apps.txt", "w") as f:
@@ -171,7 +196,7 @@ async def nuclei_scan_apps(event, scheduled_md, matched_storage=[]):
                 nuclei_args,
                 timeout=timeout,
                 debug=debug,
-                name=fn_name
+                name=fn_name,
             )
 
             # handle data
@@ -180,20 +205,23 @@ async def nuclei_scan_apps(event, scheduled_md, matched_storage=[]):
             )
 
 
-async def run_ffuf_scan(target_url, wordlists, additional_args="", timeout=None, debug=False, name=""):
+async def run_ffuf_scan(
+    target_url, wordlists, additional_args="", timeout=None, debug=False, name=""
+):
     all_wordlists = ",".join(wordlists)
     cmd = f"rr ffuf -u {target_url}FUZZ -json -noninteractive -w {all_wordlists}:l1 ---min-chunk-length 500 {additional_args} "
     # print("running", cmd)
     from rcn_core.time_event import start_scheduled_process
+
     results = await start_scheduled_process(
         cmd,
         timeout=timeout,
         debug=debug,
         name=name,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL
+        stderr=asyncio.subprocess.DEVNULL,
     )
-    
+
     if not results:
         return []
 
@@ -212,8 +240,8 @@ async def run_ffuf_scan(target_url, wordlists, additional_args="", timeout=None,
     return parse_ffuf_content(to_add)
 
 
+@rcn_event()
 async def application_fuzzing(event, scheduled_md, matched_storage=[]):
-
     fn_name = event["name"]
     remote_wordlists = event.get("remote-wordlist", [])
     local_wordlists = event.get("local-wordlists", [])
@@ -221,25 +249,29 @@ async def application_fuzzing(event, scheduled_md, matched_storage=[]):
     timeout = event.get("timeout")
     debug = event.get("debug")
     scanner_name = fn_name
-    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
+    async with get_unprocessed_entries(
+        scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
         apps = [i["entry"] for i in unscanned.values()]
         if apps:
             for app in apps:
                 url = app["url"][: app["url"].find("/", 10)]
                 to_add = await run_ffuf_scan(
-                    url, 
-                    remote_wordlists + local_wordlists, 
-                    ffuf_args, 
-                    timeout=timeout, 
+                    url,
+                    remote_wordlists + local_wordlists,
+                    ffuf_args,
+                    timeout=timeout,
                     debug=debug,
-                    name=fn_name
+                    name=fn_name,
                 )
 
                 if not to_add:
                     continue
 
                 # add the fuzzing results
-                fz_storage = get_storage_create("web-apps::fuzzing-data", parent_id=app['id'])
+                fz_storage = get_storage_create(
+                    "web-apps::fuzzing-data", parent_id=app["id"]
+                )
 
                 # Add all results to storage first
                 fz_storage.add_many(to_add, source="ffuf-fuzzing")

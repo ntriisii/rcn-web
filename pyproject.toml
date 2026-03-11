@@ -1,3 +1,4 @@
+
 [project]
 name = "rcn_web"
 version = "0.1.0"
@@ -9,12 +10,13 @@ dependencies = [
     "aiofiles",
     "fastapi",
     "mitmproxy>=10.4.0",
-    "rcn_core",
+		"watchdog",
+		"pentest_utils @ file:///home/ahmed/programming-projects/python/pentest-utils",
+    "rcn_core @ file:///home/ahmed/programming-projects/python/rcn-core",
 ]
-
-[build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["rcn_web"]
+
+[tool.uv.sources]
+rcn-core = { path = "/home/ahmed/programming-projects/python/rcn-core/", editable = true }

@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from rcn_core.data_access import match_storage
 from rcn_core.data_access import get_unprocessed_entries, get_multi_unprocessed_entries
 from rcn_web.core.utils import add_apps, get_apps, get_uniq_apps, web_match_storage
-from rcn_core.data_access import storage
+from rcn_core.data_access import get_storage
 
 
 def generate_random_data(num_entries, types=None):
@@ -204,7 +204,7 @@ async def add_custom_length_application_storage(event, scheduled_md):
     Creates and adds applications with custom content length to the target storage.
     """
     # Get target storage instance
-    target_storage = storage()
+    target_storage = get_storage()
     
     # Get parameters from event config
     num_apps = event.get("count", 5)  # Number of applications to create
@@ -241,5 +241,5 @@ async def add_custom_length_application_storage(event, scheduled_md):
     for app in created_apps:
         print(f"Added application {app['site']} with content length: {app['content_length']}")
 
-    print(len(get_uniq_apps(storage())), len(get_apps(storage())))
+    print(len(get_uniq_apps(get_storage())), len(get_apps(get_storage())))
     print(f"Successfully added {num_apps} applications with custom content lengths")

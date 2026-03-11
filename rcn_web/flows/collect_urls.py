@@ -9,6 +9,7 @@ from collections import defaultdict
 
 from pentest_utils.web.request import detect_content_type, parse_by_content_type
 from rcn_core.storage.bases import get_storage_create
+from rcn_web.core.utils import get_app_by_site
 
 # from rcn_web.core.utils import *
 # from rcn_web.storage.url import form_to_request
@@ -61,7 +62,6 @@ SEND_TIME = 10
 
 
 def extract_flow_forms(parsed, flow):
-
     resp_headers = flow["response-headers"]
     to_return = []
     content_type = resp_headers.get("content-type", "")
@@ -110,7 +110,6 @@ def extract_flow_forms(parsed, flow):
 
 
 async def collect_url_content(flow):
-
     url = flow["url"]
     path = flow["path"]
     resp_ctype = flow["response-headers"].get("content-type", None)
@@ -150,19 +149,19 @@ async def collect_url_content(flow):
 
 
 async def handle_collected_urls(st, extractor, content):
-
     data = content
     found_sites_data = defaultdict(list)
 
     for u in data:
         site = urlparse(u["url"]).netloc
         status = int(u["status"])
-        u['status'] = status
-        u['response-length'] = int(u['response-length'])
-        
+        u["status"] = status
+        u["response-length"] = int(u["response-length"])
+
         # filter requests
-        if status in [404, 400]: continue
-        
+        if status in [404, 400]:
+            continue
+
         found_sites_data[site].append(u)
 
     for site in found_sites_data:
@@ -170,20 +169,70 @@ async def handle_collected_urls(st, extractor, content):
         app_st = get_app_by_site(st, site)
 
         if not app_st:
-            app_st = get_app_by_site(st, site)
-        if not app_st:
             continue
 
         d = found_sites_data[site]
-        url_storage = get_storage_create("web-apps::app-links", parent_id=app_st['id'])
+        url_storage = get_storage_create("web-apps::app-links", parent_id=app_st["id"])
+        app_flow_storage = get_storage_create(
+            "web-apps::app-flows", parent_id=app_st["id"]
+        )
+        js_flow_storage = get_storage_create(
+            "web-apps::js-flows", parent_id=app_st["id"]
+        )
+        js_link_storage = get_storage_create(
+            "web-apps::js-links", parent_id=app_st["id"]
+        )
+
+        app_flows_to_add = []
+        js_flows_to_add = []
+        js_links_to_add = []
 
         for entry in d:
+            url = entry["url"]
+            p = urlparse(url)
+            path = p.path + ("?" + p.query if p.query else "")
+            flow_id = entry["flow-id"]
+
+            app_flows_to_add.append({"flow-id": flow_id, "path": path})
+
+            # Check if JS
+            is_js = False
+            ctype = entry.get("response-ctype", "").lower()
+            if "javascript" in ctype or p.path.endswith(".js"):
+                is_js = True
+
+            if is_js:
+                js_flows_to_add.append({"flow-id": flow_id, "path": path})
+                # Copy the full entry for js-links to keep metadata
+                js_link_entry = entry.copy()
+                js_link_entry["path"] = path
+                js_links_to_add.append(js_link_entry)
+
             # save some space by removing the URL and rebuild it when required
-            p = urlparse(entry["url"])
-            entry["path"] = p.path + ("?" + p.query if p.query else "")
-            del entry["url"]
+            entry["path"] = path
+            if "url" in entry:
+                del entry["url"]
 
         url_storage.add_many(d, source="proxy")
+
+        if app_flows_to_add:
+            app_flow_storage.add_many(app_flows_to_add, source="proxy")
+
+        if js_flows_to_add:
+            js_flow_storage.add_many(js_flows_to_add, source="proxy")
+
+        if js_links_to_add:
+            # Deduplicate js links
+            existing_js_links = {i["url"] for i in js_link_storage.get()}
+            unique_js_links = []
+            seen_urls = set()
+            for l in js_links_to_add:
+                if l["url"] not in existing_js_links and l["url"] not in seen_urls:
+                    unique_js_links.append(l)
+                    seen_urls.add(l["url"])
+
+            if unique_js_links:
+                js_link_storage.add_many(unique_js_links, source="proxy")
 
 
 async def collect_request_info(flow):
@@ -260,7 +309,9 @@ async def handle_collected_request_info(st, extractor, content):
         if not app_st:
             continue
 
-        req_storage = get_storage_create("web-apps::requests-collected-info", parent_id=app_st['id'])
+        req_storage = get_storage_create(
+            "web-apps::requests-collected-info", parent_id=app_st["id"]
+        )
 
         items_to_add = found_sites_data[site]
         collected = []

@@ -5,4 +5,14 @@ from .storage import router as storage_router
 from .test_proxy import router as test_proxy
 from .websockets import router as websockets_router
 
-__all__ = ["app_router", "ip_router", "domains_router", "storage_router", "test_proxy", "websockets_router"]
+# Import server actions to register them
+from . import server_actions
+
+__all__ = [
+    "app_router",
+    "ip_router",
+    "domains_router",
+    "storage_router",
+    "test_proxy",
+    "websockets_router",
+]

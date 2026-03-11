@@ -4,12 +4,14 @@ import sys
 import aiohttp
 import asyncio
 
-from rcn_core.data_access import storage
+from rcn_core.data_access import get_storage
 from rcn_core.data_access import get_unprocessed_annotations, get_unprocessed_entries
 from rcn_web.core.utils import mcp_server_user_interaction, web_match_storage
 from rcn_core.storage.bases import get_storage_create, add_annotation as global_add_annotation
+from rcn_core.decorators import rcn_event
 
 
+@rcn_event()
 async def mcp_ai_tag_apps_for_scanning(event, scheduled_md):
     """
     Prompt the AI to tag applications for Nuclei scanning and Fuzzing.
@@ -27,7 +29,7 @@ async def mcp_ai_tag_apps_for_scanning(event, scheduled_md):
         ai_payload = """I have a list of applications that I need you to analyze and tag for specific scanning and fuzzing tasks.
         
 You need to produce an XML output containing instructions for Nuclei scanning and Fuzzing.
-
+        
 1. **Nuclei Scanning**:
    - Root tag: `<scanning>`
    - Mandatory inner tag: `<base-url>` (the URL to scan)
@@ -93,6 +95,7 @@ def generate_wordlist():
              print("No terminal available or error sending data.")
 
 
+@rcn_event()
 async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
     """
     Collects application annotations with 'todo' keys and sends them to an AI service via WebSocket.
@@ -128,7 +131,7 @@ async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
         ai_payload += """**Very Important**:
   Strict Operational Constraints:
    1. No Discovery: Do not attempt to list all storages or applications to 'understand the environment.' Work
-      exclusively with the specific application(s) and storage(s) explicitly provided in the request.
+      exclusively with the specific application(s) and get_storage(s) explicitly provided in the request.
    2. No Assumptions: Do not assume tool capabilities beyond their documented descriptions. Do not guess or 'try'
       storage names (e.g., 'todos', 'functions'); only use storage names that have been confirmed for the target
       application.
@@ -174,6 +177,7 @@ async def mcp_interactive_ai_process_todo_notes(event, scheduled_md):
              print("No terminal available or error sending data.")
 
 
+@rcn_event()
 async def mcp_ai_perform_scanning(event, scheduled_md):
     """
     Scans for 'tool-scanning' notes and executes the requested tools.
@@ -250,6 +254,7 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
                     print(f"[AI-SCAN] Error processing scanning annotation {entry.get('id')}: {e}")
 
 
+@rcn_event()
 async def mcp_ai_perform_fuzzing(event, scheduled_md):
     """
     Scans for 'tool-fuzzing' notes and executes the requested tools.
@@ -302,7 +307,7 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                          
                          # Prepend URL list as first wordlist (l1)
                          wordlists.append("file://" + l1_file)
-
+                    
                      for w in s.find_all("wordlist"):
                          path = w.text.strip()
                          if validators.url(path): wordlists.append(path)
@@ -326,7 +331,7 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                                          wordlists.append("file://" + wl_file) # TODO fix this shit
                          except Exception as e:
                              print(f"[AI-SCAN] Error executing dynamic code: {e}")
-                             
+                    
                      if not wordlists:
                          print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
                          if l1_file and os.path.exists(l1_file): os.remove(l1_file)
@@ -347,7 +352,7 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                      
                      # Cleanup l1
                      if l1_file and os.path.exists(l1_file): os.remove(l1_file)
-
+                     
                      fz_storage = get_storage_create("web-apps::fuzzing-data", parent_id=app['id'])
                      if to_add: fz_storage.add_many(to_add, source=source_id)
                      
@@ -357,3 +362,4 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                  except Exception as e:
                      global_add_annotation(None, "fuzzing-data", f"scan-result:{source_id}", "finished", parent_id=app['id'])
                      print(f"[AI-SCAN] Error processing fuzzing annotation {entry.get('id')}: {e}")
+
