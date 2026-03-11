@@ -209,8 +209,10 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         # though Python eval handles True & True anyway.
 
         try:
+            eval_ctx["entry"] = e
+            eval_ctx["flow"] = e
             # Safe eval allowing standard types but no builtins except bool
-            return bool(
+            res = bool(
                 eval(
                     processed_value,
                     {
@@ -224,6 +226,12 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
                     eval_ctx,
                 )
             )
+            if res:
+                if "filter-groups" not in e:
+                    e["filter-groups"] = []
+                if processed_value not in e["filter-groups"]:
+                    e["filter-groups"].append(processed_value)
+            return res
         except Exception:
             return False
 
@@ -559,7 +567,19 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         app = e["obj"]
         e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        return eval(value)
+        eval_ctx = e.copy()
+        eval_ctx["entry"] = e
+        eval_ctx["flow"] = e
+        try:
+            res = bool(eval(value, {"__builtins__": {}}, eval_ctx))
+            if res:
+                if "filter-groups" not in e:
+                    e["filter-groups"] = []
+                if value not in e["filter-groups"]:
+                    e["filter-groups"].append(value)
+            return res
+        except Exception:
+            return False
 
     read_notes_files()
 
