@@ -73,10 +73,7 @@ def elisp_make_fuzzing_tabulated_entries(
     fuzzing_storage, match_groups, *args, **kwargs
 ):
     def url_match_fn(e, value):
-        path = e["path"]
-        status = e["status"]
-
-        return eval(value)
+        return basic_match_fn(e, value)
 
     content = fuzzing_storage.get()
 

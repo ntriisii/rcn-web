@@ -25,14 +25,8 @@ from rcn_core.storage.bases import (
     add_annotation as global_add_annotation,
 )
 
-from .utils import (
-    make_org_link,
-    make_preview_tabulated_entries,
-)
-from pentest_utils.viewers.emacs.match_groups import (
-    parse_rule_to_node,
-    evaluate_query_node,
-)
+from pentest_utils.viewers.emacs.utils import make_org_link
+from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
 
 # Cache for TODOs data with file modification times
 TODOS_CACHE = {}
@@ -196,38 +190,7 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         if app:
             e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        # Ensure consistent fields for evaluation
-        eval_ctx = e.copy()
-        if "status_code" in eval_ctx:
-            eval_ctx["status"] = eval_ctx["status_code"]
-        elif "status" in eval_ctx:
-            eval_ctx["status_code"] = eval_ctx["status"]
-
-        # Use our global match logic with the enhanced context
-        from .utils import rcn_basic_match_fn
-
-        # rcn_basic_match_fn handles entry, flow, and ~ logic
-        # We just need to pass the extra eval_ctx variables
-        eval_ctx["entry"] = e
-        eval_ctx["flow"] = e
-        processed_value = value.replace("~", "not ")
-        try:
-            return bool(
-                eval(
-                    processed_value,
-                    {
-                        "__builtins__": {
-                            "bool": bool,
-                            "int": int,
-                            "str": str,
-                            "len": len,
-                        }
-                    },
-                    eval_ctx,
-                )
-            )
-        except:
-            return False
+        return basic_match_fn(e, value)
 
     # read_notes_files()
 
@@ -561,9 +524,7 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         app = e["obj"]
         e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        from .utils import rcn_basic_match_fn
-
-        return rcn_basic_match_fn(e, value)
+        return eval(value)
 
     read_notes_files()
 

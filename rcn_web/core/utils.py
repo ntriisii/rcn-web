@@ -83,7 +83,7 @@ def get_app_by_site(target_storage_obj, app_site: str):
 
 
 def get_app_by_id(target_storage_obj, app_id: str | int):
-    if not target_storage_obj or not app_id:
+    if not target_storage_obj:
         return None
 
     if hasattr(target_storage_obj, "targets"):
@@ -97,13 +97,10 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
     if st.storage_name not in st._schema_cache:
         return None
 
-    try:
-        id_val = int(app_id)
-    except (ValueError, TypeError):
-        return None
-
     with st.get_connection() as conn:
-        cursor = conn.execute(f"SELECT * FROM {st.table_name} WHERE id = ?", (id_val,))
+        cursor = conn.execute(
+            f"SELECT * FROM {st.table_name} WHERE id = ?", (int(app_id),)
+        )
         row = cursor.fetchone()
 
         if row:
@@ -268,7 +265,6 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
                 else (443 if parsed.scheme == "https" else 80)
             )
 
-        app_data["port"] = int(app_data["port"])
         app_data["site"] = site
         if "timestamp" in app_data:
             del app_data["timestamp"]

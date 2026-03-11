@@ -91,35 +91,16 @@ def elisp_view_app_found_sources_urls(
 
 def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
     def url_match_fn(e, value):
-        # Local context mapping for evaluation
-        ctx = e.copy()
         # Ensure consistent fields for evaluation
-        if "status" in ctx:
-            ctx["status_code"] = ctx["status"]
-        elif "status_code" in ctx:
-            ctx["status"] = ctx["status_code"]
+        if "status" in e:
+            e["status_code"] = e["status"]
+        elif "status_code" in e:
+            e["status"] = e["status_code"]
 
-        # Support ~ as logical NOT for the user
-        processed_value = value.replace("~", "not ")
-        try:
-            return bool(
-                eval(
-                    processed_value,
-                    {
-                        "__builtins__": {
-                            "bool": bool,
-                            "int": int,
-                            "str": str,
-                            "len": len,
-                        }
-                    },
-                    ctx,
-                )
-            )
-        except Exception:
-            return False
+        return basic_match_fn(e, value)
 
     content = url_storage.get()
+
     tabl_entries = dict()
 
     # make the IDs

@@ -1,18 +1,18 @@
-
 import sys
 from .utils import *
 
 
-def elisp_view_app_nuclei_scanning(vuln_s, create_windows=False, match_groups=None, *args, **kwargs):
-    
+def elisp_view_app_nuclei_scanning(
+    vuln_s, create_windows=False, match_groups=None, *args, **kwargs
+):
     collected = dict()
     tabulated_entries, tabulated_format = elisp_make_nuclei_vulns_tabulated_entries(
         vulns_storage=vuln_s, match_groups=match_groups, *args, **kwargs
     )
-    
+
     tmplate_buf_name = "*nuclei-vulns-template*"
     nuclei_resp_buf_name = "*nuclei-response*"
-    
+
     collected["window-config"] = {
         "window-1": {
             "buffer-name": "*app-vulns-entries*",
@@ -41,7 +41,7 @@ def elisp_view_app_nuclei_scanning(vuln_s, create_windows=False, match_groups=No
         "orientation": "vertical",
         "scale": 0.3,
     }
-    
+
     collected["view-store"] = {
         "web-apps::vuln-scanning": {
             "template-buffer-name": tmplate_buf_name,
@@ -50,9 +50,11 @@ def elisp_view_app_nuclei_scanning(vuln_s, create_windows=False, match_groups=No
         },
         "parent-storage": "web-apps",
     }
-    
-    if create_windows: return collected
-    else: return collected["window-config"]["window-1"]["entries"]
+
+    if create_windows:
+        return collected
+    else:
+        return collected["window-config"]["window-1"]["entries"]
 
 
 def nuclei_scanning_preview_data(sto):
@@ -66,20 +68,17 @@ def nuclei_scanning_preview_data(sto):
     return tr
 
 
-def elisp_make_nuclei_vulns_tabulated_entries(vulns_storage, match_groups, *args, **kwargs):
-    
+def elisp_make_nuclei_vulns_tabulated_entries(
+    vulns_storage, match_groups, *args, **kwargs
+):
     def url_match_fn(e, value):
-        severity = e["severity"]
-        name = e["name"]
-        tags = e["tags"]
+        return basic_match_fn(e, value)
 
-        return eval(value)
-    
     content = vulns_storage.get()
-    
+
     if not content:
         return [], ""
-    
+
     attrs = (
         ("template-id", 10),
         ("name", 20),
@@ -87,7 +86,7 @@ def elisp_make_nuclei_vulns_tabulated_entries(vulns_storage, match_groups, *args
         ("severity", 10),
         ("tags", 20),
     )
-    
+
     entries, fmt = make_preview_tabulated_entries(
         storage_instance=vulns_storage,
         attrs=attrs,
@@ -96,9 +95,8 @@ def elisp_make_nuclei_vulns_tabulated_entries(vulns_storage, match_groups, *args
         *args,
         **kwargs,
     )
-    
+
     for i, entry in enumerate(entries["entries"][::-1]):
         entry["entry"].append(content[i]["template-path"])
-    
-    return entries, fmt
 
+    return entries, fmt
