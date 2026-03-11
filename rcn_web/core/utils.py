@@ -268,6 +268,7 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
                 else (443 if parsed.scheme == "https" else 80)
             )
 
+        app_data["port"] = int(app_data["port"])
         app_data["site"] = site
         if "timestamp" in app_data:
             del app_data["timestamp"]
