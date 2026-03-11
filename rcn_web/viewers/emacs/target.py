@@ -10,6 +10,47 @@ import datetime
 import rcn_core.globals
 from rcn_web.viewers.emacs import refresh
 
+import pentest_utils.viewers.emacs.utils as pu_utils
+from pentest_utils.storage.shared import entry as entry_proxy, QueryNode
+
+
+def rcn_basic_match_fn(e, value):
+    # Ensure consistent fields for evaluation
+    if "status" in e and "status_code" not in e:
+        e["status_code"] = e["status"]
+    elif "status_code" in e and "status" not in e:
+        e["status"] = e["status_code"]
+
+    ctx = e.copy()
+    ctx["entry"] = entry_proxy
+    ctx["flow"] = entry_proxy
+
+    # Support ~ as logical NOT for the user
+    processed_value = str(value).replace("~", "not ")
+    try:
+        res = eval(
+            processed_value,
+            {
+                "__builtins__": {
+                    "bool": bool,
+                    "int": int,
+                    "str": str,
+                    "len": len,
+                }
+            },
+            ctx,
+        )
+
+        if isinstance(res, QueryNode):
+            return res.evaluate(e)
+        return bool(res)
+    except:
+        return False
+
+
+# Monkeypatch to provide robust matching logic
+pu_utils.basic_match_fn = rcn_basic_match_fn
+
 from pentest_utils.viewers.emacs.utils import (
     make_org_link,
     make_preview_tabulated_entries,
