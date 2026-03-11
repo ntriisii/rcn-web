@@ -31,25 +31,26 @@ from pentest_utils.storage.shared import QueryNode
 # Fix for the match_fn context issues globally
 def rcn_basic_match_fn(e, value):
     ctx = e.copy()
-    ctx["entry"] = e
-    ctx["flow"] = e
+    ctx["entry"] = entry
+    ctx["flow"] = entry
     # Support ~ as logical NOT for the user
     processed_value = value.replace("~", "not ")
     try:
-        return bool(
-            eval(
-                processed_value,
-                {
-                    "__builtins__": {
-                        "bool": bool,
-                        "int": int,
-                        "str": str,
-                        "len": len,
-                    }
-                },
-                ctx,
-            )
+        node = eval(
+            processed_value,
+            {
+                "__builtins__": {
+                    "bool": bool,
+                    "int": int,
+                    "str": str,
+                    "len": len,
+                }
+            },
+            ctx,
         )
+        if isinstance(node, QueryNode):
+            return node.evaluate(e)
+        return bool(node)
     except:
         return False
 
