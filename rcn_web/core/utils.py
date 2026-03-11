@@ -35,7 +35,7 @@ class ListStorage:
         sort_desc=True,
     ):
         res = self.data
-        if query_node:
+        if query_node is not None:
             res = [e for e in res if query_node.evaluate(e)]
 
         # Simple ID-based pagination for the proxy
