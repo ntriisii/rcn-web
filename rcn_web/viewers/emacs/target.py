@@ -17,6 +17,10 @@ from pentest_utils.viewers.emacs.utils import (
     read_notes_files,
     NOTES_CONTENT,
     ORG_KEY_FORG,
+    elisp_make_basic_storage_view,
+    make_basic_dict_entry_view,
+    get_app_notes,
+    elisp_make_basic_data_preview,
 )
 
 
@@ -554,7 +558,7 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         app = e["obj"]
         e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        return eval(value)
+        return basic_match_fn(e, value)
 
     read_notes_files()
 

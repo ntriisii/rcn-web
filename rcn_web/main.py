@@ -38,7 +38,7 @@ from rcn_web.viewers.emacs.target import elisp_make_app_view_data
 from rcn_web.viewers.emacs.target import elisp_make_target_view_data
 from rcn_web.viewers.emacs.target import arrange_dorks_view
 from rcn_web.viewers.emacs.ip import view_ip_data, elisp_make_ip_view
-from rcn_web.viewers.emacs.utils import make_basic_dict_entry_view
+from pentest_utils.viewers.emacs.utils import make_basic_dict_entry_view
 
 from rcn_web.core.scope import get_inscope_domains
 from rcn_web.core.scope import get_target_scope
@@ -61,7 +61,6 @@ import rcn_web.scanning.owasp
 import rcn_web.viewers.emacs.target
 import rcn_web.viewers.emacs.flows
 import rcn_web.viewers.emacs.ip
-import rcn_web.viewers.emacs.utils
 import rcn_web.viewers.emacs.dorks
 # from pentest_utils.web.rcn_helpers import get_proxy_data # commonly used in yaml
 
