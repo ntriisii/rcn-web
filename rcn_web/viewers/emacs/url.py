@@ -93,14 +93,29 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
     def url_match_fn(e, value):
         # Local context mapping for evaluation
         ctx = e.copy()
-        # Ensure 'status_code' is available as an alias for 'status'
-        if "status" in ctx and "status_code" not in ctx:
+        # Ensure consistent fields for evaluation
+        if "status" in ctx:
             ctx["status_code"] = ctx["status"]
+        elif "status_code" in ctx:
+            ctx["status"] = ctx["status_code"]
 
         # Support ~ as logical NOT for the user
         processed_value = value.replace("~", "not ")
         try:
-            return bool(eval(processed_value, {"__builtins__": {}}, ctx))
+            return bool(
+                eval(
+                    processed_value,
+                    {
+                        "__builtins__": {
+                            "bool": bool,
+                            "int": int,
+                            "str": str,
+                            "len": len,
+                        }
+                    },
+                    ctx,
+                )
+            )
         except Exception:
             return False
 

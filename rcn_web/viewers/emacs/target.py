@@ -194,15 +194,36 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         if app:
             e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        # Ensure 'status' is available as an alias for 'status_code' for consistency
-        if "status_code" in e and "status" not in e:
-            e["status"] = e["status_code"]
+        # Ensure consistent fields for evaluation
+        # Use a copy to avoid polluting the original entry more than necessary
+        eval_ctx = e.copy()
+        if "status_code" in eval_ctx:
+            eval_ctx["status"] = eval_ctx["status_code"]
+        elif "status" in eval_ctx:
+            eval_ctx["status_code"] = eval_ctx["status"]
 
         # Support ~ as logical NOT for the user
         processed_value = value.replace("~", "not ")
+
+        # Support bitwise-like & and | as logical and/or for booleans
+        # though Python eval handles True & True anyway.
+
         try:
-            # Safe eval allowing standard types but no builtins
-            return bool(eval(processed_value, {"__builtins__": {}}, e))
+            # Safe eval allowing standard types but no builtins except bool
+            return bool(
+                eval(
+                    processed_value,
+                    {
+                        "__builtins__": {
+                            "bool": bool,
+                            "int": int,
+                            "str": str,
+                            "len": len,
+                        }
+                    },
+                    eval_ctx,
+                )
+            )
         except Exception:
             return False
 
