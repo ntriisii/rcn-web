@@ -287,8 +287,10 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
     # include more attrs
     attrs = (("todos", 4),) + attrs + st_attrs + (("at", 4),)
 
+    from rcn_web.core.utils import ListStorage
+
     return make_preview_tabulated_entries(
-        tabl_entries,
+        ListStorage(list(tabl_entries.values()), "web-apps"),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,
@@ -595,8 +597,10 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
     attrs = (*attrs, ("links", 4), ("todos", 4))
 
     # include more attrs
+    from rcn_web.core.utils import ListStorage
+
     return make_preview_tabulated_entries(
-        tabl_entries,
+        ListStorage(list(tabl_entries.values()), "web-apps"),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,

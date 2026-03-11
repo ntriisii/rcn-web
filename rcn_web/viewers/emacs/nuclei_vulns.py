@@ -77,9 +77,7 @@ def elisp_make_nuclei_vulns_tabulated_entries(
     def url_match_fn(e, value):
         return basic_match_fn(e, value)
 
-    content = vulns_storage.get()
-
-    if not content:
+    if not vulns_storage:
         return [], ""
 
     attrs = (
@@ -98,8 +96,5 @@ def elisp_make_nuclei_vulns_tabulated_entries(
         *args,
         **kwargs,
     )
-
-    for i, entry in enumerate(entries["entries"][::-1]):
-        entry["entry"].append(content[i]["template-path"])
 
     return entries, fmt

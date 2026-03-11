@@ -102,14 +102,7 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
 
         return basic_match_fn(e, value)
 
-    content = url_storage.get()
-
-    tabl_entries = dict()
-
-    # make the IDs
-    for i in content:
-        tabl_entries[i["id"]] = i
-    if not content:
+    if not url_storage:
         return [], ""
 
     attrs = (
@@ -122,7 +115,7 @@ def elisp_make_sources_url_tabulated_entries(url_storage, *args, **kwargs):
     )
 
     entries, fmt = make_preview_tabulated_entries(
-        tabl_entries,
+        url_storage,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],

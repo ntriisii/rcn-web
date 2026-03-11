@@ -78,8 +78,10 @@ def make_ip_tabulated_entries(ip_data, match_groups, **kwargs):
         ("cpes", 20),
     )
 
+    from rcn_web.core.utils import ListStorage
+
     tbl_entries, tabl_format = make_preview_tabulated_entries(
-        ip_data, attrs, match_groups=match_groups, **kwargs
+        ListStorage(ip_data, "found-ips"), attrs, match_groups=match_groups, **kwargs
     )
 
     return tbl_entries, tabl_format

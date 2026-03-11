@@ -78,9 +78,7 @@ def elisp_make_fuzzing_tabulated_entries(
     def url_match_fn(e, value):
         return basic_match_fn(e, value)
 
-    content = fuzzing_storage.get()
-
-    if not content:
+    if not fuzzing_storage:
         return [], ""
 
     attrs = (("id", 0), ("path", 100), ("status", 10), ("response-hash", 6))

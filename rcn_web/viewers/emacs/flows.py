@@ -73,22 +73,13 @@ def elisp_view_app_flows(
 
 
 def elisp_make_flows_tabulated_entries(flow_storage, *args, **kwargs):
-    content = flow_storage.get()
-    tabl_entries = dict()
-
-    # The flow-id is likely the timestamp or a unique ID.
-    # We want the ID as the key.
-
-    for i in content:
-        tabl_entries[i["id"]] = i
-
-    if not content:
+    if not flow_storage:
         return [], ""
 
     attrs = (("path", 100), ("flow-id", 20))
 
     entries, fmt = make_preview_tabulated_entries(
-        tabl_entries,
+        flow_storage,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
