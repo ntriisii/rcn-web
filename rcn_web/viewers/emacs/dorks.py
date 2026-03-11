@@ -1,11 +1,10 @@
-
 import sys
 import rcn_core.globals
 
 from rcn_web.core.scope import get_scope_wildcards
 
 from pentest_utils.viewers.emacs.utils import make_org_link
-from pentest_utils.viewers.emacs.utils import elisp_make_org_headline
+from .target import elisp_make_org_headline
 
 
 def arrange_dorks_view():
@@ -45,7 +44,6 @@ def arrange_dorks_view():
 
 
 def arrange_dorks_preview():
-
     # google = arrange_google_dorks_previews()
     # github = arrange_github_dorks_previews()
     # shodan = arrange_shodan_dorks_previews()
@@ -83,9 +81,7 @@ def arrange_google_dorks_views():
         return dork + ")"
 
     intp_vars = rcn_core.globals.YAML_FILE_CONTENT.get("target-data-variables")
-    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get(
-        "google-dorks"
-    )
+    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get("google-dorks")
     if not dorks:
         return dict()
 
@@ -106,9 +102,7 @@ def arrange_google_dorks_views():
 
 def arrange_github_dorks_views():
     intp_vars = rcn_core.globals.YAML_FILE_CONTENT.get("target-data-variables")
-    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get(
-        "github-dorks"
-    )
+    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get("github-dorks")
     if not dorks:
         return dict()
 
@@ -130,9 +124,7 @@ def arrange_github_dorks_views():
 
 def arrange_shodan_dorks_views():
     intp_vars = rcn_core.globals.YAML_FILE_CONTENT.get("target-data-variables")
-    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get(
-        "shodan-dorks"
-    )
+    dorks = rcn_core.globals.YAML_FILE_CONTENT.get("dorks", dict()).get("shodan-dorks")
     if not dorks:
         return dict()
 

@@ -10,6 +10,7 @@ from pentest_utils.viewers.emacs.utils import (
     make_preview_tabulated_entries,
     basic_match_fn,
 )
+from .target import elisp_make_org_headline
 from rcn_web.core.utils import get_storage
 from rcn_web.storage.ip import get_shodan_ip_data
 from rcn_web.core.scope import get_inscope_domains

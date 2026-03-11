@@ -14,10 +14,36 @@ from pentest_utils.viewers.emacs.utils import (
     make_org_link,
     make_preview_tabulated_entries,
     basic_match_fn,
-    elisp_make_org_headline,
     read_notes_files,
     NOTES_CONTENT,
+    ORG_KEY_FORG,
 )
+
+
+def elisp_make_org_headline(name, entries, push_btn=None, storage_name=None):
+    headline = {
+        "entries": {},
+        "name": name,
+    }
+    if push_btn:
+        headline["push-btn-fn"] = push_btn
+    elif storage_name:
+        headline["push-btn-fn"] = (
+            f'(lambda () (interactive) (rcn-view--basic-push-btn-with-storage "{storage_name}"))'
+        )
+    else:
+        headline["push-btn-fn"] = "rcn-view--basic-push-btn"
+
+    if type(entries) == dict:
+        for key, value in entries.items():
+            headline["entries"][key] = {"value": value, "key-foreground": ORG_KEY_FORG}
+
+    elif type(entries) == list:
+        headline["entries"][name] = [str(i) for i in entries]
+
+    return headline
+
+
 from .ip import preview_ip_data
 from .dorks import arrange_dorks_view, arrange_dorks_preview
 from .dorks import arrange_google_dorks_views
