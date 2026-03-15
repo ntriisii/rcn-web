@@ -57,12 +57,14 @@ class ScanResultsRequest(BaseModel):
 
 @router.post("/check_scan_results")
 async def check_scan_results(request: ScanResultsRequest):
+    from rcn_web.core.utils import get_app_by_id, get_app_by_site
+
     st = get_storage()
     app = None
     if request.app_id:
-        app = st, request.app_id
+        app = get_app_by_id(st, request.app_id)
     if not app and request.app_site:
-        app = st, request.app_site
+        app = get_app_by_site(st, request.app_site)
 
     if not app:
         return JSONResponse({"status": "error", "message": "App not found"})
@@ -101,8 +103,13 @@ async def check_scan_results(request: ScanResultsRequest):
         )
         if annotations_st:
             key = f"scan-result:{request.source_name}"
+            base_storage = (
+                target_storage_name.split("::")[-1]
+                if "::" in target_storage_name
+                else target_storage_name
+            )
             completed_annotations = annotations_st.get_filtered(
-                f"key = '{key}' AND storage_name = '{target_storage_name}'"
+                f"key = '{key}' AND (storage_name = '{target_storage_name}' OR storage_name = '{base_storage}')"
             )
             if completed_annotations:
                 annotation = completed_annotations[0]

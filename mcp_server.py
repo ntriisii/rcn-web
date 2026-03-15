@@ -147,13 +147,15 @@ def add_note(
         "app_name": [app_name],
         "storage_name": [storage_name] if storage_name else [],
         "entry_id": entry_id,
-        "note_key": note_key,
-        "note_value": note_value,
+        "key": note_key,
+        "value": note_value,
         "category": category,
     }
 
     try:
-        resp = requests.post(f"{RCN_SERVER_URL}/storage/addEntryNote", json=payload)
+        resp = requests.post(
+            f"{RCN_SERVER_URL}/storage/addEntryAnnotation", json=payload
+        )
         if resp.status_code != 200:
             return f"Error adding note: {resp.text}"
 
@@ -415,22 +417,30 @@ def _perform_security_task(app_name: str, scan_type: str, config_xml: str) -> st
         "app_name": [app],
         "storage_name": ["web-apps"],
         "entry_id": app,
-        "note_key": note_key,
-        "note_value": wrapped_xml,
+        "key": note_key,
+        "value": wrapped_xml,
     }
 
     try:
-        resp = requests.post(f"{RCN_SERVER_URL}/storage/addEntryNote", json=payload)
+        resp = requests.post(
+            f"{RCN_SERVER_URL}/storage/addEntryAnnotation", json=payload
+        )
         if resp.status_code != 200:
             results.append(f"Error adding note for {app}: {resp.text}")
         else:
             resp_data = resp.json()
-            if isinstance(resp_data, dict) and "notes" in resp_data:
+            if isinstance(resp_data, dict) and "annotations" in resp_data:
+                all_added_notes.extend(resp_data["annotations"])
+                results.append(
+                    f"Scheduled {scan_type} for {app} (Source ID: {source_id})"
+                )
+
+            elif isinstance(resp_data, dict) and "notes" in resp_data:
                 all_added_notes.extend(resp_data["notes"])
                 results.append(
                     f"Scheduled {scan_type} for {app} (Source ID: {source_id})"
                 )
-            
+
             else:
                 results.append(
                     f"Scheduled {scan_type} for {app} (Response: {resp_data})"
