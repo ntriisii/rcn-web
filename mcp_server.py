@@ -446,8 +446,7 @@ def _perform_security_task(app_name: str, scan_type: str, config_xml: str) -> st
                     f"Scheduled {scan_type} for {app} (Response: {resp_data})"
                 )
 
-    except Exception as e:
-        results.append(f"Connection error for {app}: {e}")
+    except Exception as e: results.append(f"Connection error for {app}: {e}")
 
     if all_added_notes:
         results.append("Waiting for results (polling storage)...")
@@ -511,5 +510,4 @@ def perform_fuzzing(app_name: str, config_xml: str) -> str:
 
 
 RCN_SERVER_URL = "http://localhost:8023"
-if __name__ == "__main__":
-    mcp.run()
+if __name__ == "__main__": mcp.run()

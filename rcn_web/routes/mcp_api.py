@@ -58,24 +58,21 @@ class ScanResultsRequest(BaseModel):
 @router.post("/check_scan_results")
 async def check_scan_results(request: ScanResultsRequest):
     from rcn_web.core.utils import get_app_by_id, get_app_by_site
-
+    
     st = get_storage()
     app = None
     if request.app_id:
         app = get_app_by_id(st, request.app_id)
     if not app and request.app_site:
         app = get_app_by_site(st, request.app_site)
-
-    if not app:
-        return JSONResponse({"status": "error", "message": "App not found"})
-
+    
+    if not app: return JSONResponse({"status": "error", "message": "App not found"})
+    
     results = []
-
+    
     target_storage_name = None
-    if request.scan_type == "scanning":
-        target_storage_name = "web-apps::nuclei-scanning"
-    elif request.scan_type == "fuzzing":
-        target_storage_name = "web-apps::fuzzing-data"
+    if request.scan_type == "scanning": target_storage_name = "web-apps::nuclei-scanning"
+    elif request.scan_type == "fuzzing": target_storage_name = "web-apps::fuzzing-data"
     else:
         return JSONResponse(
             {
@@ -84,7 +81,7 @@ async def check_scan_results(request: ScanResultsRequest):
             },
             status_code=404,
         )
-
+    
     # Check for data
     st_obj = get_storage_create(target_storage_name, parent_id=app["id"])
     if st_obj:
@@ -95,12 +92,10 @@ async def check_scan_results(request: ScanResultsRequest):
             )
             if entries:
                 results.extend(entries)
-
+    
     # If no results found, check for completion annotation
     if not results and st_obj:
-        annotations_st = get_storage_create(
-            "web-apps::annotations", parent_id=app["id"]
-        )
+        annotations_st = get_storage_create("web-apps::annotations", parent_id=app["id"])
         if annotations_st:
             key = f"scan-result:{request.source_name}"
             base_storage = (
@@ -121,11 +116,11 @@ async def check_scan_results(request: ScanResultsRequest):
                         "timestamp": annotation.get("timestamp"),
                     }
                 )
-
+    
     # Format results as text
     if not results:
         return PlainTextResponse("No new scan results found yet.", status_code=404)
-
+    
     text_output = []
     text_output.append(
         f"Scan Results for {request.source_name} (Type: {request.scan_type})"
@@ -140,7 +135,7 @@ async def check_scan_results(request: ScanResultsRequest):
         # Filter out internal keys if desired, similar to get_text_view
         internal_keys = ["source_id"]
         keys = [k for k in keys if k not in internal_keys]
-
+        
         text_output.append("each line of entry in this storage consists of:")
         for k in keys:
             text_output.append(k)
@@ -148,7 +143,7 @@ async def check_scan_results(request: ScanResultsRequest):
         text_output.append("and it will be seperated by ##")
         text_output.append("")
         text_output.append("DATA:")
-
+        
         entry_blocks = []
         for row in results:
             entry_lines = []
@@ -160,3 +155,4 @@ async def check_scan_results(request: ScanResultsRequest):
         text_output.append("\n##\n".join(entry_blocks))
 
     return PlainTextResponse("\n".join(text_output))
+

@@ -110,6 +110,7 @@ async def scan_app(app_name: str, config_xml: str, **kwargs):
     """
     Triggers a Nuclei scanning task.
     """
+    
     return await _trigger_security_task(app_name, config_xml, "scanning")
 
 
@@ -118,6 +119,7 @@ async def fuzz_app(app_name: str, config_xml: str, **kwargs):
     """
     Triggers a FFUF fuzzing task.
     """
+    
     return await _trigger_security_task(app_name, config_xml, "fuzzing")
 
 
@@ -128,32 +130,30 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
     from rcn_core.storage.bases import add_annotation
 
     st = get_storage()
-    if not st:
-        return {"status": "error", "message": "Storage not initialized"}
-
+    if not st: return {"status": "error", "message": "Storage not initialized"}
+    
     app = get_app_by_site(st, app_name)
-    if not app:
-        return {"status": "error", "message": f"App {app_name} not found"}
-
+    if not app: return {"status": "error", "message": f"App {app_name} not found"}
+    
     # Generate unique source ID
     rand_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
     source_id = f"mcp-{scan_type}-{rand_str}"
 
     # Wrap config XML
     wrapped_xml = f"<root><source_id>{source_id}</source_id>{config_xml}</root>"
-
     category = f"tool-{scan_type}"
-
+    
     try:
         # We add the annotation to the application
         res_id = add_annotation(
-            entry_id=app_name,
+            entry_id=app["id"],
             storage_name="web-apps",
             key=source_id,
             value=wrapped_xml,
             parent_id=app["id"],
             category=category,
         )
+        
         return {
             "status": "success",
             "source_id": source_id,

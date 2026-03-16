@@ -539,15 +539,29 @@ def web_match_storage(match_str, target=None):
 
     if container in ["web-apps", "all-web-apps", "apps"]:
         if not sub_storage_name:
-            st = current_storage.get_storage_create("web-apps")
             if is_annotations:
-                return [
-                    {
+                if container == "web-apps":
+                    apps = get_uniq_apps(current_storage)
+                else:
+                    apps = get_apps(current_storage)
+
+                to_return = []
+                for app in apps:
+                    st = get_storage_create("web-apps", parent_id=app["id"])
+                    item = {
+                        "parent": app,
                         "storage": st.annotations_storage,
-                        "parent": current_storage,
                         "reference_storage": st,
                     }
-                ]
+                    if hasattr(current_storage, "name"):
+                        item["target_name"] = current_storage.name
+                    to_return.append(item)
+                print(
+                    f"DEBUG: web_match_storage returning {len(to_return)} items for {container}::annotations"
+                )
+                return to_return
+
+            st = current_storage.get_storage_create("web-apps")
             return [{"storage": st, "parent": current_storage}]
 
         if container == "web-apps":
