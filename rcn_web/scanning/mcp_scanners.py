@@ -211,90 +211,104 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
 
     scanner_name = event["name"]
 
-    # Process scanning annotations
+    async def _process_mcp_scanning_annotation(item):
+        entry = item["entry"]
+        xml_content = entry.get("value", "")
+
+        try:
+            s = soup(xml_content, "xml")
+
+            source_id = "nuclei-scanning"
+            if s.find("source_id"):
+                source_id = s.find("source_id").text.strip()
+
+            if not s.find("scanning") and not s.find("config"):
+                return
+
+            base_url_tag = s.find("base-url") or s.find("target") or s.find("url")
+            base_url_text = base_url_tag.text.strip() if base_url_tag else None
+            if not base_url_text:
+                return
+
+            # Parse multiple URLs
+            target_urls = [u.strip() for u in base_url_text.splitlines() if u.strip()]
+            if not target_urls:
+                return
+
+            templates = s.find("templates").text.strip() if s.find("templates") else ""
+            args = s.find("args").text.strip() if s.find("args") else ""
+
+            # Create a temporary file for the targets
+            rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
+            target_file = f"/tmp/nuclei_target_{rand_str}.txt"
+
+            async with aiof.open(target_file, "w") as f:
+                await f.write("\n".join(target_urls))
+
+            print(
+                f"[AI-SCAN] Running Nuclei on {len(target_urls)} targets with templates: {templates}"
+            )
+
+            results = await run_nuclei_scan(
+                target_file,
+                templates,
+                args,
+                timeout=event.get("timeout", ""),
+                debug=event.get("debug", False),
+                name=f"{scanner_name}-nuclei",
+            )
+
+            # Cleanup
+            if os.path.exists(target_file):
+                os.remove(target_file)
+
+            # Process results
+            if results:
+                await handle_nuclei_scanning_entries(
+                    [json.loads(i) for i in results.split("\n") if i.strip()],
+                    source=source_id,
+                )
+
+            # Add completion annotation
+            app = item.get("parent")
+            if app:
+                global_add_annotation(
+                    None,
+                    "nuclei-scanning",
+                    f"scan-result:{source_id}",
+                    "finished",
+                    parent_id=app["id"],
+                )
+
+        except Exception as e:
+            print(
+                f"[AI-SCAN] Error processing scanning annotation {entry.get('id')}: {e}"
+            )
+
+    # 1. Process annotations for the TARGET itself
     async with get_unprocessed_annotations(
         "tool-scanning", scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
         if unscanned:
+            print("************** TARGET ANNOTATIONS **************")
+            print(unscanned)
+            print("************************************************")
             for item in unscanned.values():
-                entry = item["entry"]
-                xml_content = entry.get("value", "")
+                await _process_mcp_scanning_annotation(item)
 
-                try:
-                    s = soup(xml_content, "xml")
-
-                    source_id = "nuclei-scanning"
-                    if s.find("source_id"):
-                        source_id = s.find("source_id").text.strip()
-
-                    if not s.find("scanning") and not s.find("config"):
-                        continue
-
-                    base_url_tag = (
-                        s.find("base-url") or s.find("target") or s.find("url")
-                    )
-                    base_url_text = base_url_tag.text.strip() if base_url_tag else None
-                    if not base_url_text:
-                        continue
-
-                    # Parse multiple URLs
-                    target_urls = [
-                        u.strip() for u in base_url_text.splitlines() if u.strip()
-                    ]
-                    if not target_urls:
-                        continue
-
-                    templates = (
-                        s.find("templates").text.strip() if s.find("templates") else ""
-                    )
-                    args = s.find("args").text.strip() if s.find("args") else ""
-
-                    # Create a temporary file for the targets
-                    rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
-                    target_file = f"/tmp/nuclei_target_{rand_str}.txt"
-
-                    async with aiof.open(target_file, "w") as f:
-                        await f.write("\n".join(target_urls))
-
-                    print(
-                        f"[AI-SCAN] Running Nuclei on {len(target_urls)} targets with templates: {templates}"
-                    )
-
-                    results = await run_nuclei_scan(
-                        target_file,
-                        templates,
-                        args,
-                        timeout=event.get("timeout", ""),
-                        debug=event.get("debug", False),
-                        name=f"{scanner_name}-nuclei",
-                    )
-
-                    # Cleanup
-                    if os.path.exists(target_file):
-                        os.remove(target_file)
-
-                    # Process results
-                    if results:
-                        await handle_nuclei_scanning_entries(
-                            [json.loads(i) for i in results.split("\n") if i.strip()],
-                            source=source_id,
-                        )
-
-                    # Add completion annotation
-                    app = item.get("parent")
-                    if app:
-                        global_add_annotation(
-                            None,
-                            "nuclei-scanning",
-                            f"scan-result:{source_id}",
-                            "finished",
-                            parent_id=app["id"],
-                        )
-
-                except Exception as e:
-                    print(
-                        f"[AI-SCAN] Error processing scanning annotation {entry.get('id')}: {e}"
-                    )
+    # 2. Process annotations for ALL APPLICATIONS
+    # We use the special storage key that includes all web apps
+    async with web_match_storage(
+        "all-web-apps::web-apps::annotations"
+    ).get_unprocessed_annotations(
+        scanner_name, 10, category="tool-scanning"
+    ) as unscanned:
+        if unscanned:
+            print("************** APP ANNOTATIONS **************")
+            print(unscanned)
+            print("*********************************************")
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
 
 
 @rcn_event()
@@ -314,138 +328,144 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
 
     scanner_name = event["name"]
 
-    # Process fuzzing annotations
+    async def _process_mcp_fuzzing_annotation(item):
+        entry = item["entry"]
+        app = item["parent"]
+        xml_content = entry.get("value", "")
+
+        try:
+            s = soup(xml_content, "xml")
+
+            source_id = "ai-ffuf-fuzzing"
+            if s.find("source_id"):
+                source_id = s.find("source_id").text.strip()
+
+            if not s.find("fuzzing") and not s.find("config"):
+                return
+
+            base_dir = sys.argv[1]
+            base_url_tag = s.find("base-url") or s.find("target") or s.find("url")
+            base_url_text = base_url_tag.text.strip() if base_url_tag else None
+            if not base_url_text:
+                return
+
+            # Parse multiple URLs (l1)
+            target_urls = [u.strip() for u in base_url_text.splitlines() if u.strip()]
+            if not target_urls:
+                return
+
+            wordlists = []  # l2, l3, ...
+
+            # Handle l1 (URLs)
+            l1_file = None
+            if len(target_urls) > 0:
+                rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
+                l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
+                async with aiof.open(l1_file, "w") as f:
+                    await f.write("\n".join(target_urls))
+
+                # Prepend URL list as first wordlist (l1)
+                wordlists.append("file://" + l1_file)
+
+            for w in s.find_all("wordlist"):
+                path = w.text.strip()
+                if validators.url(path):
+                    wordlists.append(path)
+                else:
+                    wordlists.append("file://" + os.path.join(base_dir, path))
+
+            args = s.find("args").text.strip() if s.find("args") else ""
+            dynamic_code = (
+                s.find("dynamic-code").text.strip() if s.find("dynamic-code") else None
+            )
+
+            # Handle dynamic code generation
+            if dynamic_code:
+                try:
+                    local_scope = {}
+                    exec(dynamic_code, {}, local_scope)
+                    if "generate_wordlist" in local_scope:
+                        generated_list = local_scope["generate_wordlist"]()
+                        if isinstance(generated_list, list):
+                            rand_str = "".join(
+                                random.choices(string.ascii_lowercase, k=8)
+                            )
+                            wl_file = f"/tmp/gen_wordlist_{rand_str}.txt"
+                            async with aiof.open(wl_file, "w") as f:
+                                await f.write(
+                                    "\n".join([str(i) for i in generated_list])
+                                )
+                                wordlists.append(
+                                    "file://" + wl_file
+                                )  # TODO fix this shit
+                except Exception as e:
+                    print(f"[AI-SCAN] Error executing dynamic code: {e}")
+
+            if not wordlists:
+                print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
+                if l1_file and os.path.exists(l1_file):
+                    os.remove(l1_file)
+                return
+
+            print(
+                f"[AI-SCAN] Running FFUF on {target_urls[0]} with {len(wordlists)} wordlists"
+            )
+
+            to_add = await run_ffuf_scan(
+                target_urls[0],  # Primary target or placeholder
+                wordlists,
+                args,
+                timeout=event.get("timeout", ""),
+                debug=event.get("debug", False),
+                name=f"{scanner_name}-ffuf",
+            )
+
+            # Cleanup l1
+            if l1_file and os.path.exists(l1_file):
+                os.remove(l1_file)
+
+            fz_storage = get_storage_create(
+                "web-apps::fuzzing-data", parent_id=app["id"]
+            )
+            if to_add:
+                fz_storage.add_many(to_add, source=source_id)
+
+            # Add completion annotation
+            global_add_annotation(
+                None,
+                "fuzzing-data",
+                f"scan-result:{source_id}",
+                "finished",
+                parent_id=app["id"],
+            )
+
+        except Exception as e:
+            if app:
+                global_add_annotation(
+                    None,
+                    "fuzzing-data",
+                    f"scan-result:{source_id}",
+                    "finished",
+                    parent_id=app["id"],
+                )
+            print(
+                f"[AI-SCAN] Error processing fuzzing annotation {entry.get('id')}: {e}"
+            )
+
+    # 1. Process annotations for the TARGET itself
     async with get_unprocessed_annotations(
         "tool-fuzzing", scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
         if unscanned:
             for item in unscanned.values():
-                entry = item["entry"]
-                app = item["parent"]
-                xml_content = entry.get("value", "")
+                await _process_mcp_fuzzing_annotation(item)
 
-                try:
-                    s = soup(xml_content, "xml")
-
-                    source_id = "ai-ffuf-fuzzing"
-                    if s.find("source_id"):
-                        source_id = s.find("source_id").text.strip()
-
-                    if not s.find("fuzzing") and not s.find("config"):
-                        continue
-
-                    base_dir = sys.argv[1]
-                    base_url_tag = (
-                        s.find("base-url") or s.find("target") or s.find("url")
-                    )
-                    base_url_text = base_url_tag.text.strip() if base_url_tag else None
-                    if not base_url_text:
-                        continue
-
-                    # Parse multiple URLs (l1)
-                    target_urls = [
-                        u.strip() for u in base_url_text.splitlines() if u.strip()
-                    ]
-                    if not target_urls:
-                        continue
-
-                    wordlists = []  # l2, l3, ...
-
-                    # Handle l1 (URLs)
-                    l1_file = None
-                    if len(target_urls) > 0:
-                        rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
-                        l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
-                        async with aiof.open(l1_file, "w") as f:
-                            await f.write("\n".join(target_urls))
-
-                        # Prepend URL list as first wordlist (l1)
-                        wordlists.append("file://" + l1_file)
-
-                    for w in s.find_all("wordlist"):
-                        path = w.text.strip()
-                        if validators.url(path):
-                            wordlists.append(path)
-                        else:
-                            wordlists.append("file://" + os.path.join(base_dir, path))
-
-                    args = s.find("args").text.strip() if s.find("args") else ""
-                    dynamic_code = (
-                        s.find("dynamic-code").text.strip()
-                        if s.find("dynamic-code")
-                        else None
-                    )
-
-                    # Handle dynamic code generation
-                    if dynamic_code:
-                        try:
-                            local_scope = {}
-                            exec(dynamic_code, {}, local_scope)
-                            if "generate_wordlist" in local_scope:
-                                generated_list = local_scope["generate_wordlist"]()
-                                if isinstance(generated_list, list):
-                                    rand_str = "".join(
-                                        random.choices(string.ascii_lowercase, k=8)
-                                    )
-                                    wl_file = f"/tmp/gen_wordlist_{rand_str}.txt"
-                                    async with aiof.open(wl_file, "w") as f:
-                                        await f.write(
-                                            "\n".join([str(i) for i in generated_list])
-                                        )
-                                        wordlists.append(
-                                            "file://" + wl_file
-                                        )  # TODO fix this shit
-                        except Exception as e:
-                            print(f"[AI-SCAN] Error executing dynamic code: {e}")
-
-                    if not wordlists:
-                        print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
-                        if l1_file and os.path.exists(l1_file):
-                            os.remove(l1_file)
-                        continue
-
-                    print(
-                        f"[AI-SCAN] Running FFUF on {base_url} with {len(wordlists)} wordlists"
-                    )
-
-                    app = item["parent"]  # Application dict
-
-                    to_add = await run_ffuf_scan(
-                        target_urls[0],  # Primary target or placeholder
-                        wordlists,
-                        args,
-                        timeout=event.get("timeout", ""),
-                        debug=event.get("debug", False),
-                        name=f"{scanner_name}-ffuf",
-                    )
-
-                    # Cleanup l1
-                    if l1_file and os.path.exists(l1_file):
-                        os.remove(l1_file)
-
-                    fz_storage = get_storage_create(
-                        "web-apps::fuzzing-data", parent_id=app["id"]
-                    )
-                    if to_add:
-                        fz_storage.add_many(to_add, source=source_id)
-
-                    # Add completion annotation
-                    global_add_annotation(
-                        None,
-                        "fuzzing-data",
-                        f"scan-result:{source_id}",
-                        "finished",
-                        parent_id=app["id"],
-                    )
-
-                except Exception as e:
-                    global_add_annotation(
-                        None,
-                        "fuzzing-data",
-                        f"scan-result:{source_id}",
-                        "finished",
-                        parent_id=app["id"],
-                    )
-                    print(
-                        f"[AI-SCAN] Error processing fuzzing annotation {entry.get('id')}: {e}"
-                    )
+    # 2. Process annotations for ALL APPLICATIONS
+    async with web_match_storage(
+        "all-web-apps::web-apps::annotations"
+    ).get_unprocessed_annotations(
+        scanner_name, 10, category="tool-fuzzing"
+    ) as unscanned:
+        if unscanned:
+            for item in unscanned.values():
+                await _process_mcp_fuzzing_annotation(item)
