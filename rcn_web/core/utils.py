@@ -397,17 +397,19 @@ class RemoteFlowsAdapter(StorageMetaData):
             flow["response-headers"] = self._convert_headers(flow["response-headers"])
         return flow
 
-    def _storage_md_get_data_storage(self, requester="", count=1000):
-        last_ts = self.storage_md_get(requester + "-last-id-timestamp") or 0.0
+    def _storage_md_get_data_storage(self, requester="", count=1000, category=None):
+        actual_requester = f"{requester}:{category}" if category else requester
+        last_ts = self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
         data = [f for f in self._cache if float(f.get("timestamp", 0)) > float(last_ts)]
-        self.storage_md_set(requester + "-last-id-index", 0)
+        self.storage_md_set(actual_requester + "-last-id-index", 0)
         return data
 
-    async def _fetch_and_update_cache(self, requester, count=100):
+    async def _fetch_and_update_cache(self, requester, count=100, category=None):
         should_fetch = True
+        actual_requester = f"{requester}:{category}" if category else requester
         if requester:
             last_ts = float(
-                self.storage_md_get(requester + "-last-id-timestamp") or 0.0
+                self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
             )
             available = sum(
                 1
@@ -473,9 +475,11 @@ class RemoteFlowsAdapter(StorageMetaData):
             pass
 
     @asynccontextmanager
-    async def get_unprocessed_entries(self, requester, count):
-        await self._fetch_and_update_cache(requester, count)
-        async with super().get_unprocessed_entries(requester, count) as unprocessed:
+    async def get_unprocessed_entries(self, requester, count, category=None):
+        await self._fetch_and_update_cache(requester, count, category=category)
+        async with super().get_unprocessed_entries(
+            requester, count, category=category
+        ) as unprocessed:
             for i in unprocessed:
                 i["id"] = i["timestamp"]
             yield unprocessed
