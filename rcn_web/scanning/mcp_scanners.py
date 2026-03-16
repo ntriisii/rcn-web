@@ -453,8 +453,363 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
             )
 
     # 1. Process annotations for the TARGET itself
+    # We use the original event (which should have require-storage: annotations or similar)
+    async with get_unprocessed_annotations(
+        "tool-scanning", scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            print("************** TARGET ANNOTATIONS **************")
+            print(unscanned)
+            print("************************************************")
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
+
+    # 2. Process annotations for ALL APPLICATIONS
+    # We override require-storage for this specific check
+    app_event = event.copy()
+    app_event["require-storage"] = "all-web-apps::web-apps::annotations"
+    async with get_unprocessed_annotations(
+        "tool-scanning", scanner_name, app_event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            print("************** APP ANNOTATIONS **************")
+            print(unscanned)
+            print("*********************************************")
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
+
+
+@rcn_event()
+async def mcp_ai_perform_fuzzing(event, scheduled_md):
+    """
+    Scans for 'tool-fuzzing' notes and executes the requested tools.
+    """
+
+    import os
+    import string
+    import random
+    import validators
+    import aiofiles as aiof
+
+    from bs4 import BeautifulSoup as soup
+    from rcn_web.scanning.utils import run_ffuf_scan
+
+    scanner_name = event["name"]
+
+    async def _process_mcp_fuzzing_annotation(item):
+        entry = item["entry"]
+        app = item["parent"]
+        xml_content = entry.get("value", "")
+
+        try:
+            s = soup(xml_content, "xml")
+
+            source_id = "ai-ffuf-fuzzing"
+            if s.find("source_id"):
+                source_id = s.find("source_id").text.strip()
+
+            if not s.find("fuzzing") and not s.find("config"):
+                return
+
+            base_dir = sys.argv[1]
+            base_url_tag = s.find("base-url") or s.find("target") or s.find("url")
+            base_url_text = base_url_tag.text.strip() if base_url_tag else None
+            if not base_url_text:
+                return
+
+            # Parse multiple URLs (l1)
+            target_urls = [u.strip() for u in base_url_text.splitlines() if u.strip()]
+            if not target_urls:
+                return
+
+            wordlists = []  # l2, l3, ...
+
+            # Handle l1 (URLs)
+            l1_file = None
+            if len(target_urls) > 0:
+                rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
+                l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
+                async with aiof.open(l1_file, "w") as f:
+                    await f.write("\n".join(target_urls))
+
+                # Prepend URL list as first wordlist (l1)
+                wordlists.append("file://" + l1_file)
+
+            for w in s.find_all("wordlist"):
+                path = w.text.strip()
+                if validators.url(path):
+                    wordlists.append(path)
+                else:
+                    wordlists.append("file://" + os.path.join(base_dir, path))
+
+            args = s.find("args").text.strip() if s.find("args") else ""
+            dynamic_code = (
+                s.find("dynamic-code").text.strip() if s.find("dynamic-code") else None
+            )
+
+            # Handle dynamic code generation
+            if dynamic_code:
+                try:
+                    local_scope = {}
+                    exec(dynamic_code, {}, local_scope)
+                    if "generate_wordlist" in local_scope:
+                        generated_list = local_scope["generate_wordlist"]()
+                        if isinstance(generated_list, list):
+                            rand_str = "".join(
+                                random.choices(string.ascii_lowercase, k=8)
+                            )
+                            wl_file = f"/tmp/gen_wordlist_{rand_str}.txt"
+                            async with aiof.open(wl_file, "w") as f:
+                                await f.write(
+                                    "\n".join([str(i) for i in generated_list])
+                                )
+                                wordlists.append(
+                                    "file://" + wl_file
+                                )  # TODO fix this shit
+                except Exception as e:
+                    print(f"[AI-SCAN] Error executing dynamic code: {e}")
+
+            if not wordlists:
+                print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
+                if l1_file and os.path.exists(l1_file):
+                    os.remove(l1_file)
+                return
+
+            print(
+                f"[AI-SCAN] Running FFUF on {target_urls[0]} with {len(wordlists)} wordlists"
+            )
+
+            to_add = await run_ffuf_scan(
+                target_urls[0],  # Primary target or placeholder
+                wordlists,
+                args,
+                timeout=event.get("timeout", ""),
+                debug=event.get("debug", False),
+                name=f"{scanner_name}-ffuf",
+            )
+
+            # Cleanup l1
+            if l1_file and os.path.exists(l1_file):
+                os.remove(l1_file)
+
+            fz_storage = get_storage_create(
+                "web-apps::fuzzing-data", parent_id=app["id"]
+            )
+            if to_add:
+                fz_storage.add_many(to_add, source=source_id)
+
+            # Add completion annotation
+            global_add_annotation(
+                None,
+                "fuzzing-data",
+                f"scan-result:{source_id}",
+                "finished",
+                parent_id=app["id"],
+            )
+
+        except Exception as e:
+            if app:
+                global_add_annotation(
+                    None,
+                    "fuzzing-data",
+                    f"scan-result:{source_id}",
+                    "finished",
+                    parent_id=app["id"],
+                )
+            print(
+                f"[AI-SCAN] Error processing fuzzing annotation {entry.get('id')}: {e}"
+            )
+
+    # 1. Process annotations for the TARGET itself
+    async with get_unprocessed_annotations(
+        "tool-scanning", scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            print("************** TARGET ANNOTATIONS **************")
+            print(unscanned)
+            print("************************************************")
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
+
+    # 2. Process annotations for ALL APPLICATIONS
+    # Create a copy of the event and update require-storage
+    app_event = event.copy()
+    app_event["require-storage"] = "all-web-apps::web-apps::annotations"
+    async with get_unprocessed_annotations(
+        "tool-scanning", scanner_name, app_event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            print("************** APP ANNOTATIONS **************")
+            print(unscanned)
+            print("*********************************************")
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
+
+
+@rcn_event()
+async def mcp_ai_perform_fuzzing(event, scheduled_md):
+    """
+    Scans for 'tool-fuzzing' notes and executes the requested tools.
+    """
+
+    import os
+    import string
+    import random
+    import validators
+    import aiofiles as aiof
+
+    from bs4 import BeautifulSoup as soup
+    from rcn_web.scanning.utils import run_ffuf_scan
+
+    scanner_name = event["name"]
+
+    async def _process_mcp_fuzzing_annotation(item):
+        entry = item["entry"]
+        app = item["parent"]
+        xml_content = entry.get("value", "")
+
+        try:
+            s = soup(xml_content, "xml")
+
+            source_id = "ai-ffuf-fuzzing"
+            if s.find("source_id"):
+                source_id = s.find("source_id").text.strip()
+
+            if not s.find("fuzzing") and not s.find("config"):
+                return
+
+            base_dir = sys.argv[1]
+            base_url_tag = s.find("base-url") or s.find("target") or s.find("url")
+            base_url_text = base_url_tag.text.strip() if base_url_tag else None
+            if not base_url_text:
+                return
+
+            # Parse multiple URLs (l1)
+            target_urls = [u.strip() for u in base_url_text.splitlines() if u.strip()]
+            if not target_urls:
+                return
+
+            wordlists = []  # l2, l3, ...
+
+            # Handle l1 (URLs)
+            l1_file = None
+            if len(target_urls) > 0:
+                rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
+                l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
+                async with aiof.open(l1_file, "w") as f:
+                    await f.write("\n".join(target_urls))
+
+                # Prepend URL list as first wordlist (l1)
+                wordlists.append("file://" + l1_file)
+
+            for w in s.find_all("wordlist"):
+                path = w.text.strip()
+                if validators.url(path):
+                    wordlists.append(path)
+                else:
+                    wordlists.append("file://" + os.path.join(base_dir, path))
+
+            args = s.find("args").text.strip() if s.find("args") else ""
+            dynamic_code = (
+                s.find("dynamic-code").text.strip() if s.find("dynamic-code") else None
+            )
+
+            # Handle dynamic code generation
+            if dynamic_code:
+                try:
+                    local_scope = {}
+                    exec(dynamic_code, {}, local_scope)
+                    if "generate_wordlist" in local_scope:
+                        generated_list = local_scope["generate_wordlist"]()
+                        if isinstance(generated_list, list):
+                            rand_str = "".join(
+                                random.choices(string.ascii_lowercase, k=8)
+                            )
+                            wl_file = f"/tmp/gen_wordlist_{rand_str}.txt"
+                            async with aiof.open(wl_file, "w") as f:
+                                await f.write(
+                                    "\n".join([str(i) for i in generated_list])
+                                )
+                                wordlists.append(
+                                    "file://" + wl_file
+                                )  # TODO fix this shit
+                except Exception as e:
+                    print(f"[AI-SCAN] Error executing dynamic code: {e}")
+
+            if not wordlists:
+                print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
+                if l1_file and os.path.exists(l1_file):
+                    os.remove(l1_file)
+                return
+
+            print(
+                f"[AI-SCAN] Running FFUF on {target_urls[0]} with {len(wordlists)} wordlists"
+            )
+
+            to_add = await run_ffuf_scan(
+                target_urls[0],  # Primary target or placeholder
+                wordlists,
+                args,
+                timeout=event.get("timeout", ""),
+                debug=event.get("debug", False),
+                name=f"{scanner_name}-ffuf",
+            )
+
+            # Cleanup l1
+            if l1_file and os.path.exists(l1_file):
+                os.remove(l1_file)
+
+            fz_storage = get_storage_create(
+                "web-apps::fuzzing-data", parent_id=app["id"]
+            )
+            if to_add:
+                fz_storage.add_many(to_add, source=source_id)
+
+            # Add completion annotation
+            global_add_annotation(
+                None,
+                "fuzzing-data",
+                f"scan-result:{source_id}",
+                "finished",
+                parent_id=app["id"],
+            )
+
+        except Exception as e:
+            if app:
+                global_add_annotation(
+                    None,
+                    "fuzzing-data",
+                    f"scan-result:{source_id}",
+                    "finished",
+                    parent_id=app["id"],
+                )
+            print(
+                f"[AI-SCAN] Error processing fuzzing annotation {entry.get('id')}: {e}"
+            )
+
+    # 1. Process annotations for the TARGET itself
     async with get_unprocessed_annotations(
         "tool-fuzzing", scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            for item in unscanned.values():
+                await _process_mcp_fuzzing_annotation(item)
+
+    # 2. Process annotations for ALL APPLICATIONS
+    app_event = event.copy()
+    app_event["require-storage"] = "all-web-apps::web-apps::annotations"
+    async with get_unprocessed_annotations(
+        "tool-fuzzing", scanner_name, app_event, match_storage_fn=web_match_storage
+    ) as unscanned:
+        if unscanned:
+            for item in unscanned.values():
+                await _process_mcp_fuzzing_annotation(item)
+
+    # 2. Process annotations for ALL APPLICATIONS
+    app_event = event.copy()
+    app_event["require-storage"] = "all-web-apps::web-apps::annotations"
+    async with get_unprocessed_annotations(
+        "tool-fuzzing", scanner_name, app_event, match_storage_fn=web_match_storage
     ) as unscanned:
         if unscanned:
             for item in unscanned.values():
