@@ -106,13 +106,58 @@ async def delegate_to_acp(
 
 
 @register_action
-async def scan_app(app_name: str, config_xml: str, scan_type: str):
+async def scan_app(app_name: str, config_xml: str, **kwargs):
     """
-    Triggers a scan or fuzzing task.
+    Triggers a Nuclei scanning task.
     """
-    # This would interface with the scanning subsystem (nuclei/ffuf)
-    # Since we are just setting up the architecture, a placeholder is fine,
-    # or we can call the actual function if we know where it is.
-    # In rcn-web, scanning logic is likely in rcn_web.scanning.
+    
+    return await _trigger_security_task(app_name, config_xml, "scanning")
 
-    return {"status": "success", "message": f"{scan_type} task started for {app_name}."}
+
+@register_action
+async def fuzz_app(app_name: str, config_xml: str, **kwargs):
+    """
+    Triggers a FFUF fuzzing task.
+    """
+    
+    return await _trigger_security_task(app_name, config_xml, "fuzzing")
+
+
+async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str):
+    import random
+    import string
+    from rcn_web.storage.utils import get_storage, get_app_by_site
+    from rcn_core.storage.bases import add_annotation
+
+    st = get_storage()
+    if not st: return {"status": "error", "message": "Storage not initialized"}
+    
+    app = get_app_by_site(st, app_name)
+    if not app: return {"status": "error", "message": f"App {app_name} not found"}
+    
+    # Generate unique source ID
+    rand_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    source_id = f"mcp-{scan_type}-{rand_str}"
+
+    # Wrap config XML
+    wrapped_xml = f"<root><source_id>{source_id}</source_id>{config_xml}</root>"
+    category = f"tool-{scan_type}"
+    
+    try:
+        # We add the annotation to the application
+        res_id = add_annotation(
+            entry_id=app["id"],
+            storage_name="web-apps",
+            key=source_id,
+            value=wrapped_xml,
+            parent_id=app["id"],
+            category=category,
+        )
+        
+        return {
+            "status": "success",
+            "source_id": source_id,
+            "message": f"{scan_type.capitalize()} task started for {app_name}.",
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

@@ -1,12 +1,10 @@
-
 import sys
-from rcn_web.viewers.emacs.utils import make_preview_tabulated_entries
+from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
 
 
 def elisp_view_app_flows(
     flow_storage, create_windows=False, match_groups=None, *args, **kwargs
 ):
-
     if not match_groups:
         match_groups = dict()
 
@@ -68,31 +66,25 @@ def elisp_view_app_flows(
         "parent-storage": "web-apps",
     }
 
-    if create_windows: return collected
-    else: return collected["window-config"]["window-1"]["entries"]
+    if create_windows:
+        return collected
+    else:
+        return collected["window-config"]["window-1"]["entries"]
 
 
 def elisp_make_flows_tabulated_entries(flow_storage, *args, **kwargs):
-    content = flow_storage.get()
-    tabl_entries = dict()
-
-    # The flow-id is likely the timestamp or a unique ID.
-    # We want the ID as the key.
-    
-    for i in content: tabl_entries[i["id"]] = i
-
-    if not content: return [], ""
+    if not flow_storage:
+        return [], ""
 
     attrs = (("path", 100), ("flow-id", 20))
 
     entries, fmt = make_preview_tabulated_entries(
-        tabl_entries,
+        flow_storage,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
         *args,
-        **kwargs
+        **kwargs,
     )
 
     return entries, fmt
-

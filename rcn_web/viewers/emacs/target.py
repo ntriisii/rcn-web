@@ -10,7 +10,85 @@ import datetime
 import rcn_core.globals
 from rcn_web.viewers.emacs import refresh
 
-from .utils import *
+import pentest_utils.viewers.emacs.utils as pu_utils
+from pentest_utils.storage.shared import entry as entry_proxy, QueryNode
+
+
+def rcn_basic_match_fn(e, value):
+    # Ensure consistent fields for evaluation
+    if "status" in e and "status_code" not in e:
+        e["status_code"] = e["status"]
+    elif "status_code" in e and "status" not in e:
+        e["status"] = e["status_code"]
+
+    ctx = e.copy()
+    ctx["entry"] = entry_proxy
+    ctx["flow"] = entry_proxy
+
+    # Support ~ as logical NOT for the user
+    processed_value = str(value).replace("~", "not ")
+    try:
+        res = eval(
+            processed_value,
+            {
+                "__builtins__": {
+                    "bool": bool,
+                    "int": int,
+                    "str": str,
+                    "len": len,
+                }
+            },
+            ctx,
+        )
+
+        if isinstance(res, QueryNode):
+            return res.evaluate(e)
+        return bool(res)
+    except:
+        return False
+
+
+# Monkeypatch to provide robust matching logic
+pu_utils.basic_match_fn = rcn_basic_match_fn
+
+from pentest_utils.viewers.emacs.utils import (
+    make_org_link,
+    make_preview_tabulated_entries,
+    basic_match_fn,
+    read_notes_files,
+    NOTES_CONTENT,
+    ORG_KEY_FORG,
+    elisp_make_basic_storage_view,
+    make_basic_dict_entry_view,
+    get_app_notes,
+    elisp_make_basic_data_preview,
+)
+
+
+def elisp_make_org_headline(name, entries, push_btn=None, storage_name=None):
+    headline = {
+        "entries": {},
+        "name": name,
+    }
+    if push_btn:
+        headline["push-btn-fn"] = push_btn
+    elif storage_name:
+        headline["push-btn-fn"] = (
+            f'(lambda () (interactive) (rcn-view--basic-push-btn-with-storage "{storage_name}"))'
+        )
+    else:
+        headline["push-btn-fn"] = "rcn-view--basic-push-btn"
+
+    if type(entries) == dict:
+        for key, value in entries.items():
+            headline["entries"][key] = {"value": value, "key-foreground": ORG_KEY_FORG}
+
+    elif type(entries) == list:
+        headline["entries"][name] = [str(i) for i in entries]
+
+    return headline
+
+
 from .ip import preview_ip_data
 from .dorks import arrange_dorks_view, arrange_dorks_preview
 from .dorks import arrange_google_dorks_views
@@ -24,9 +102,6 @@ from rcn_core.storage.bases import (
     get_storage_create,
     add_annotation as global_add_annotation,
 )
-
-from pentest_utils.viewers.emacs.utils import make_org_link
-from pentest_utils.viewers.emacs.utils import make_preview_tabulated_entries
 
 # Cache for TODOs data with file modification times
 TODOS_CACHE = {}
@@ -186,9 +261,11 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         match_groups = dict()
 
     def apps_match_fn(e, value):
-        app = e["obj"]
-        e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
-        return eval(value)
+        app = e.get("obj")
+        if app:
+            e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
+
+        return basic_match_fn(e, value)
 
     # read_notes_files()
 
@@ -251,8 +328,10 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
     # include more attrs
     attrs = (("todos", 4),) + attrs + st_attrs + (("at", 4),)
 
+    from rcn_web.core.utils import ListStorage
+
     return make_preview_tabulated_entries(
-        tabl_entries,
+        ListStorage(list(tabl_entries.values()), "web-apps"),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,
@@ -522,7 +601,7 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         app = e["obj"]
         e["notes"] = NOTES_CONTENT.get(app["site"] + ".org", "")
 
-        return eval(value)
+        return basic_match_fn(e, value)
 
     read_notes_files()
 
@@ -559,8 +638,10 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
     attrs = (*attrs, ("links", 4), ("todos", 4))
 
     # include more attrs
+    from rcn_web.core.utils import ListStorage
+
     return make_preview_tabulated_entries(
-        tabl_entries,
+        ListStorage(list(tabl_entries.values()), "web-apps"),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,

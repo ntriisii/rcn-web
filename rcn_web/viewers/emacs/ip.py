@@ -5,9 +5,12 @@ import asyncio
 import datetime
 import sys
 
-from pentest_utils.viewers.emacs.utils import make_org_link
-
-from .utils import *
+from pentest_utils.viewers.emacs.utils import (
+    make_org_link,
+    make_preview_tabulated_entries,
+    basic_match_fn,
+)
+from .target import elisp_make_org_headline
 from rcn_web.core.utils import get_storage
 from rcn_web.storage.ip import get_shodan_ip_data
 from rcn_web.core.scope import get_inscope_domains
@@ -20,7 +23,6 @@ def preview_ip_data(target):
 
 
 def view_ip_data(target, match_groups=None, create_windows=True, **kwargs):
-
     if not match_groups:
         match_groups = dict()
 
@@ -76,8 +78,10 @@ def make_ip_tabulated_entries(ip_data, match_groups, **kwargs):
         ("cpes", 20),
     )
 
+    from rcn_web.core.utils import ListStorage
+
     tbl_entries, tabl_format = make_preview_tabulated_entries(
-        ip_data, attrs, match_groups=match_groups, **kwargs
+        ListStorage(ip_data, "found-ips"), attrs, match_groups=match_groups, **kwargs
     )
 
     return tbl_entries, tabl_format
@@ -115,7 +119,6 @@ def extract_censys_relevant_data(censys_entry):
 
 
 def ips_all_sources_info():
-
     internetdb_content = get_storage().get_storage_create("shodan-internetdb-ips").get()
     shodan_content = get_storage().get_storage_create("shodan-scrapped-ips").get()
     censys_content = get_storage().get_storage_create("censys-ips").get()
@@ -207,7 +210,6 @@ def ips_all_sources_info():
 
 
 def elisp_make_ip_view(ip):
-
     def domain_to_app_site(domain):
         st = get_storage()
         app = get_app_by_site(st, domain)
@@ -219,7 +221,7 @@ def elisp_make_ip_view(ip):
         link = ""
         if app:
             link = make_org_link(
-                f'elisp:(rcn-view--view-app-org-content "{app['site']}")', app['site']
+                f'elisp:(rcn-view--view-app-org-content "{app["site"]}")', app["site"]
             )
         else:
             link = make_org_link("https://" + domain + "/", domain)
@@ -424,8 +426,8 @@ def elisp_make_ip_view(ip):
             name="hosted applications",
             entries=[
                 make_org_link(
-                    "elisp:(rcn-view--view-app-org-content " f'"{app['site']}")',
-                    desc=app['site'],
+                    f'elisp:(rcn-view--view-app-org-content "{app["site"]}")',
+                    desc=app["site"],
                 )
                 for app in get_uniq_apps(s)
                 if app.host == ip

@@ -1,5 +1,8 @@
 import sys
-from .utils import *
+from pentest_utils.viewers.emacs.utils import (
+    basic_match_fn,
+    make_preview_tabulated_entries,
+)
 
 
 def elisp_view_app_fuzzing(
@@ -73,14 +76,9 @@ def elisp_make_fuzzing_tabulated_entries(
     fuzzing_storage, match_groups, *args, **kwargs
 ):
     def url_match_fn(e, value):
-        path = e["path"]
-        status = e["status"]
+        return basic_match_fn(e, value)
 
-        return eval(value)
-
-    content = fuzzing_storage.get()
-
-    if not content:
+    if not fuzzing_storage:
         return [], ""
 
     attrs = (("id", 0), ("path", 100), ("status", 10), ("response-hash", 6))

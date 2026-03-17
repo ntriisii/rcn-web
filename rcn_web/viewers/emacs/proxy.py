@@ -1,4 +1,4 @@
-from .utils import *
+from pentest_utils.viewers.emacs.utils import PAGE_LIMIT
 
 
 def proxy_history_views_make_tabulated_entries(
@@ -8,7 +8,6 @@ def proxy_history_views_make_tabulated_entries(
     page=0,
     limit=PAGE_LIMIT,
 ):
-
     attrs = (
         ("index", 0),
         ("path", 75),
@@ -28,5 +27,4 @@ def proxy_history_views_make_tabulated_entries(
 def proxy_history_view(
     cache_views: list, page=0, reset_page_counter=False, match_groups=dict()
 ):
-
     global PAGE_ID_MAPPING

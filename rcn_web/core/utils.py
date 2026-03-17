@@ -19,6 +19,49 @@ from typing import Callable, Any
 from multidict import MultiDict
 from urllib.parse import urlparse, ParseResult
 
+
+class ListStorage:
+    def __init__(self, data, storage_name="list-proxy"):
+        self.data = data
+        self.storage_name = storage_name
+        self.length = len(data)
+
+    def get_view_data(
+        self,
+        query_node=None,
+        limit=100,
+        after_id=None,
+        before_id=None,
+        sort_desc=True,
+    ):
+        res = self.data
+        if query_node is not None:
+            res = [e for e in res if query_node.evaluate(e)]
+
+        # Simple ID-based pagination for the proxy
+        if after_id is not None:
+            idx = -1
+            for i, e in enumerate(res):
+                if str(e.get("id")) == str(after_id):
+                    idx = i
+                    break
+            if idx != -1:
+                res = res[idx + 1 :]
+        elif before_id is not None:
+            idx = -1
+            for i, e in enumerate(res):
+                if str(e.get("id")) == str(before_id):
+                    idx = i
+                    break
+            if idx != -1:
+                res = res[:idx]
+
+        if sort_desc:
+            res = res[::-1]
+
+        return res[:limit]
+
+
 import rcn_core.globals
 from rcn_core.log import rlog
 from rcn_core.storage.target_storage import TargetStorage
@@ -354,17 +397,19 @@ class RemoteFlowsAdapter(StorageMetaData):
             flow["response-headers"] = self._convert_headers(flow["response-headers"])
         return flow
 
-    def _storage_md_get_data_storage(self, requester="", count=1000):
-        last_ts = self.storage_md_get(requester + "-last-id-timestamp") or 0.0
+    def _storage_md_get_data_storage(self, requester="", count=1000, category=None):
+        actual_requester = f"{requester}:{category}" if category else requester
+        last_ts = self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
         data = [f for f in self._cache if float(f.get("timestamp", 0)) > float(last_ts)]
-        self.storage_md_set(requester + "-last-id-index", 0)
+        self.storage_md_set(actual_requester + "-last-id-index", 0)
         return data
 
-    async def _fetch_and_update_cache(self, requester, count=100):
+    async def _fetch_and_update_cache(self, requester, count=100, category=None):
         should_fetch = True
+        actual_requester = f"{requester}:{category}" if category else requester
         if requester:
             last_ts = float(
-                self.storage_md_get(requester + "-last-id-timestamp") or 0.0
+                self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
             )
             available = sum(
                 1
@@ -430,9 +475,11 @@ class RemoteFlowsAdapter(StorageMetaData):
             pass
 
     @asynccontextmanager
-    async def get_unprocessed_entries(self, requester, count):
-        await self._fetch_and_update_cache(requester, count)
-        async with super().get_unprocessed_entries(requester, count) as unprocessed:
+    async def get_unprocessed_entries(self, requester, count, category=None):
+        await self._fetch_and_update_cache(requester, count, category=category)
+        async with super().get_unprocessed_entries(
+            requester, count, category=category
+        ) as unprocessed:
             for i in unprocessed:
                 i["id"] = i["timestamp"]
             yield unprocessed
@@ -492,15 +539,29 @@ def web_match_storage(match_str, target=None):
 
     if container in ["web-apps", "all-web-apps", "apps"]:
         if not sub_storage_name:
-            st = current_storage.get_storage_create("web-apps")
             if is_annotations:
-                return [
-                    {
+                if container == "web-apps":
+                    apps = get_uniq_apps(current_storage)
+                else:
+                    apps = get_apps(current_storage)
+
+                to_return = []
+                for app in apps:
+                    st = get_storage_create("web-apps", parent_id=app["id"])
+                    item = {
+                        "parent": app,
                         "storage": st.annotations_storage,
-                        "parent": current_storage,
                         "reference_storage": st,
                     }
-                ]
+                    if hasattr(current_storage, "name"):
+                        item["target_name"] = current_storage.name
+                    to_return.append(item)
+                print(
+                    f"DEBUG: web_match_storage returning {len(to_return)} items for {container}::annotations"
+                )
+                return to_return
+
+            st = current_storage.get_storage_create("web-apps")
             return [{"storage": st, "parent": current_storage}]
 
         if container == "web-apps":

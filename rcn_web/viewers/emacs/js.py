@@ -1,7 +1,6 @@
 import sys
-from rcn_web.viewers.emacs.utils import (
+from pentest_utils.viewers.emacs.utils import (
     make_preview_tabulated_entries,
-    elisp_make_basic_storage_view,
 )
 
 
@@ -76,19 +75,13 @@ def elisp_view_js_flows(
 
 
 def elisp_make_js_flows_tabulated_entries(flow_storage, *args, **kwargs):
-    content = flow_storage.get()
-    tabl_entries = dict()
-
-    for i in content:
-        tabl_entries[i["id"]] = i
-
-    if not content:
+    if not flow_storage:
         return [], ""
 
     attrs = (("path", 100), ("flow-id", 20))
 
     entries, fmt = make_preview_tabulated_entries(
-        tabl_entries,
+        flow_storage,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
@@ -172,13 +165,7 @@ def elisp_view_js_links(
 
 
 def elisp_make_js_links_tabulated_entries(url_storage, *args, **kwargs):
-    content = url_storage.get()
-    tabl_entries = dict()
-
-    # make the IDs
-    for i in content:
-        tabl_entries[i["id"]] = i
-    if not content:
+    if not url_storage:
         return [], ""
 
     attrs = (
@@ -191,7 +178,7 @@ def elisp_make_js_links_tabulated_entries(url_storage, *args, **kwargs):
     )
 
     entries, fmt = make_preview_tabulated_entries(
-        tabl_entries,
+        url_storage,
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
@@ -217,6 +204,8 @@ def js_links_preview_data(sto, page=0, reset_page_counter=False, match_groups=No
 def elisp_view_js_secrets(
     secret_storage, create_windows=False, match_groups=None, *args, **kwargs
 ):
+    from pentest_utils.viewers.emacs.utils import elisp_make_basic_storage_view
+
     return elisp_make_basic_storage_view(secret_storage, *args, **kwargs)
 
 
