@@ -245,10 +245,6 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
             async with aiof.open(target_file, "w") as f:
                 await f.write("\n".join(target_urls))
 
-            print(
-                f"[AI-SCAN] Running Nuclei on {len(target_urls)} targets with templates: {templates}"
-            )
-
             results = await run_nuclei_scan(
                 target_file,
                 templates,
@@ -288,14 +284,11 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
 
     # Process annotations using the correct storage mapping
     event_copy = event.copy()
-    event_copy["require-storage"] = "web-apps::annotations"
     async with get_unprocessed_annotations(
-        "tool-scanning", scanner_name, event_copy, match_storage_fn=web_match_storage
+        "tool-scanning", scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
+        print(f"[DEBUG] mcp_ai_perform_scanning unscanned={unscanned}")
         if unscanned:
-            print(
-                f"************** FOUND {len(unscanned)} SCANNING ANNOTATIONS **************"
-            )
             for item in unscanned.values():
                 await _process_mcp_scanning_annotation(item)
 
@@ -394,10 +387,6 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                     os.remove(l1_file)
                 return
 
-            print(
-                f"[AI-SCAN] Running FFUF on {target_urls[0]} with {len(wordlists)} wordlists"
-            )
-
             to_add = await run_ffuf_scan(
                 target_urls[0],  # Primary target or placeholder
                 wordlists,
@@ -442,14 +431,9 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
             )
 
     # Process annotations using the correct storage mapping
-    event_copy = event.copy()
-    event_copy["require-storage"] = "web-apps::annotations"
     async with get_unprocessed_annotations(
-        "tool-fuzzing", scanner_name, event_copy, match_storage_fn=web_match_storage
+        "tool-fuzzing", scanner_name, event, match_storage_fn=web_match_storage
     ) as unscanned:
         if unscanned:
-            print(
-                f"************** FOUND {len(unscanned)} FUZZING ANNOTATIONS **************"
-            )
             for item in unscanned.values():
                 await _process_mcp_fuzzing_annotation(item)

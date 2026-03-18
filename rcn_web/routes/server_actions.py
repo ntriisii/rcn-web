@@ -29,10 +29,24 @@ async def add_note(
 
     # Resolve storage
     try:
+        # Find the target storage this app belongs to
+        target_id = app.get("parent_id")
+        ts = get_storage()
+        parent_target = None
+        if hasattr(ts, "targets"):
+            for t in ts.targets.values():
+                if t.id == target_id:
+                    parent_target = t
+                    break
+        if not parent_target and hasattr(ts, "id") and ts.id == target_id:
+            parent_target = ts
+
         if st_name == "web-apps":
-            st = get_storage().get_storage_create(st_name)
+            st = (parent_target or get_storage()).get_storage_create(st_name)
         else:
-            st = get_storage_create(st_name, parent_id=app["id"])
+            st = get_storage_create(
+                st_name, parent_id=app["id"], parent_obj=parent_target
+            )
     except Exception as e:
         raise ValueError(f"Storage '{st_name}' not found or error accessing it: {e}")
 
@@ -285,7 +299,7 @@ async def scan_app(app_name: str, config_xml: str, scan_type: str, **kwargs):
     # Reuse add_note logic or call it
     # We add the note to the app itself (web-apps::annotations)
 
-    add_note(
+    await add_note(
         app_name=app_name,
         entry_id=app_name,  # App name as ID for app-level note
         note_key=note_key,
