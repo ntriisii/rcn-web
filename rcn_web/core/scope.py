@@ -1,7 +1,7 @@
-
 import re
 import rcn_core.globals
 from urllib.parse import urlparse
+
 
 def get_scope_urls(data):
     config = rcn_core.globals.TARGET_CONFIG
@@ -9,37 +9,49 @@ def get_scope_urls(data):
         config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_urls(config)
 
+
 def get_scope_wildcards(data):
     config = rcn_core.globals.TARGET_CONFIG
     if not config.get("targets"):
         config = rcn_core.globals.YAML_FILE_CONTENT
     return get_config_wildcards(config)
 
+
 def get_config_wildcards(config: dict):
     wildcards = []
-    
-    # 1. Check if this is a target-specific config
+
+    # 1. Check if this is a target-specific config (direct scope key)
     t_scope = config.get("scope", {})
     if isinstance(t_scope, dict) and "wildcards" in t_scope:
         wildcards.extend(t_scope.get("wildcards", []))
 
-    # 2. Check if this is the global targets data
+    # 2. Check if this is the global targets data (nested under 'targets' key)
     else:
         targets_data = config.get("targets", {})
         if targets_data:
             for target_name, target_info in targets_data.items():
-                if not isinstance(target_info, dict): continue
+                if not isinstance(target_info, dict):
+                    continue
                 t_scope = target_info.get("scope", {})
                 if isinstance(t_scope, dict):
                     wildcards.extend(t_scope.get("wildcards", []))
-                
+        else:
+            # 3. Check if targets are at top level (target_name as key, not under 'targets')
+            for key, value in config.items():
+                if isinstance(value, dict) and "scope" in value:
+                    t_scope = value.get("scope", {})
+                    if isinstance(t_scope, dict):
+                        wildcards.extend(t_scope.get("wildcards", []))
+
     if wildcards:
         return [i.replace("*.", "").replace("*", "") for i in wildcards]
     return []
+
+
 def get_config_urls(config: dict):
     urls = []
-    
-    # 1. Check if this is a target-specific config
+
+    # 1. Check if this is a target-specific config (direct scope key)
     t_scope = config.get("scope", {})
     if isinstance(t_scope, dict) and "urls" in t_scope:
         t_urls = t_scope.get("urls", [])
@@ -48,12 +60,13 @@ def get_config_urls(config: dict):
         elif isinstance(t_urls, str):
             urls.append(t_urls)
 
-    # 2. Check if this is the global targets data
+    # 2. Check if this is the global targets data (nested under 'targets' key)
     else:
         targets_data = config.get("targets", {})
         if targets_data:
             for target_name, target_info in targets_data.items():
-                if not isinstance(target_info, dict): continue
+                if not isinstance(target_info, dict):
+                    continue
                 t_scope = target_info.get("scope", {})
                 if isinstance(t_scope, dict):
                     t_urls = t_scope.get("urls", [])
@@ -61,7 +74,20 @@ def get_config_urls(config: dict):
                         urls.extend(t_urls)
                     elif isinstance(t_urls, str):
                         urls.append(t_urls)
+        else:
+            # 3. Check if targets are at top level (target_name as key, not under 'targets')
+            for key, value in config.items():
+                if isinstance(value, dict) and "scope" in value:
+                    t_scope = value.get("scope", {})
+                    if isinstance(t_scope, dict):
+                        t_urls = t_scope.get("urls", [])
+                        if isinstance(t_urls, list):
+                            urls.extend(t_urls)
+                        elif isinstance(t_urls, str):
+                            urls.append(t_urls)
     return urls
+
+
 def get_target_scope():
     scope = dict()
     scopewc = get_scope_wildcards([])
@@ -70,21 +96,28 @@ def get_target_scope():
     scope["urls"] = scopeurl
     return scope
 
+
 def flow_in_scope(flow):
     domain = urlparse(flow["url"]).hostname
     in_scope_header = flow["request-headers"].get("x-mitmp-tab-name", "")
     scope = get_target_scope()
-    if scope is None: return False
+    if scope is None:
+        return False
     inscope = check_domain_in_scope(domain, scope)
     return inscope or in_scope_header
 
+
 def check_domain_in_scope(domain: str, scope: dict):
-    if not domain: return False
+    if not domain:
+        return False
     for i in scope.get("wildcards", []):
-        if i in domain: return True
+        if i in domain:
+            return True
     for i in scope.get("urls", []):
-        if domain == i: return True
+        if domain == i:
+            return True
     return False
+
 
 def get_inscope_domains(data: list):
     scopewc = get_scope_wildcards([])
