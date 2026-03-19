@@ -124,11 +124,12 @@ async def fuzz_app(app_name: str, config_xml: str, **kwargs):
 
 
 async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str):
+    
     import random
     import string
     from rcn_web.storage.utils import get_storage, get_app_by_site
     from rcn_core.storage.bases import add_annotation
-
+    
     st = get_storage()
     if not st: return {"status": "error", "message": "Storage not initialized"}
     
@@ -138,7 +139,7 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
     # Generate unique source ID
     rand_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
     source_id = f"mcp-{scan_type}-{rand_str}"
-
+    
     # Wrap config XML
     wrapped_xml = f"<root><source_id>{source_id}</source_id>{config_xml}</root>"
     category = f"tool-{scan_type}"
@@ -150,7 +151,7 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
             storage_name="web-apps",
             key=source_id,
             value=wrapped_xml,
-            parent_id=app["id"],
+            parent_id=app["parent_id"],
             category=category,
         )
         
@@ -159,5 +160,5 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
             "source_id": source_id,
             "message": f"{scan_type.capitalize()} task started for {app_name}.",
         }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    
+    except Exception as e: return {"status": "error", "message": str(e)}
