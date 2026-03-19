@@ -144,3 +144,6 @@ __pycache__/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# agent-shell
+.agent-shell/**/*
