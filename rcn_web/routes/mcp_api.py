@@ -61,10 +61,8 @@ async def check_scan_results(request: ScanResultsRequest):
     
     st = get_storage()
     app = None
-    if request.app_id:
-        app = get_app_by_id(st, request.app_id)
-    if not app and request.app_site:
-        app = get_app_by_site(st, request.app_site)
+    if request.app_id: app = get_app_by_id(st, request.app_id)
+    if not app and request.app_site: app = get_app_by_site(st, request.app_site)
     
     if not app: return JSONResponse({"status": "error", "message": "App not found"})
     

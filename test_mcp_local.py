@@ -4,74 +4,6 @@ import os
 import time
 from unittest.mock import MagicMock
 
-# Mock missing dependencies in the environment
-MOCK_MODULES = [
-    "ruamel",
-    "ruamel.yaml",
-    "pydantic",
-    "fastapi",
-    "fastapi.responses",
-    "validators",
-    "aiohttp",
-    "aiohttp.client_reqrep",
-    "multidict",
-    "aiofiles",
-    "bs4",
-    "bs4.element",
-    "httpx",
-    "requests",
-    "xmltodict",
-    "chepy",
-    "chepy.core",
-    "jq",
-    "yaml",
-    "psutil",
-    "selenium",
-    "selenium.webdriver",
-    "selenium.webdriver.chrome.options",
-    "selenium.webdriver.common.by",
-    "selenium.webdriver.support.ui",
-    "selenium.webdriver.support",
-    "selenium.common.exceptions",
-    "webdriver_manager",
-    "webdriver_manager.chrome",
-    "fake_useragent",
-    "google",
-    "google.genai",
-    "google.generativeai",
-    "openai",
-    "anthropic",
-    "google.oauth2",
-    "google_auth_oauthlib",
-    "googleapiclient",
-    "groq",
-    "mistralai",
-    "ipwhois",
-    "tqdm",
-    "rich",
-    "rich.logging",
-    "rich.console",
-    "rich.table",
-    "rich.panel",
-    "rich.live",
-    "rich.progress",
-    "rich.markdown",
-    "shodan",
-    "censys",
-    "spyse",
-    "vizydrop",
-    "aiohttp_socks",
-    "censys.search",
-    "ipwhois.ipwhois",
-    "mitmproxy",
-    "mitmproxy.http",
-    "mitmproxy.core",
-]
-for mod in MOCK_MODULES:
-    if mod not in sys.modules:
-        sys.modules[mod] = MagicMock()
-
-
 # Mock xxhash
 class MockXXHash:
     def xxh32(self, data, seed=0):
@@ -358,21 +290,21 @@ async def main():
         print(f"\n--- 3. Simulating Processing ---")
         await simulate_processing(APP_NAME, "py_mcp_ai_perform_scanning")
 
-    # print(f"\n--- 4. Mocking Results & Completion ---")
-    # from rcn_core.storage.bases import add_annotation
+    print(f"\n--- 4. Mocking Results & Completion ---")
+    from rcn_core.storage.bases import add_annotation
 
-    # app = get_app_by_site(get_storage(), APP_NAME)
-    # add_annotation(
-    #     entry_id=app["id"],
-    #     storage_name="nuclei-scanning",
-    #     key=f"scan-result:{source_id}",
-    #     value="finished",
-    #     parent_id=app["id"],
-    #     category="scan-result",
-    # )
+    app = get_app_by_site(get_storage(), APP_NAME)
+    add_annotation(
+        entry_id=app["id"],
+        storage_name="nuclei-scanning",
+        key=f"scan-result:{source_id}",
+        value="finished",
+        parent_id=app["id"],
+        category="scan-result",
+    )
 
-    # print(f"\n--- 5. Verifying Results via API Logic ---")
-    # print(f"Status: {await check_results_local(APP_NAME, source_id)}")
+    print(f"\n--- 5. Verifying Results via API Logic ---")
+    print(f"Status: {await check_results_local(APP_NAME, source_id)}")
 
 
 if __name__ == "__main__":

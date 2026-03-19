@@ -98,12 +98,7 @@ async def request(flow: HTTPFlow):
 
         print(f"Starting rcn_web for {target_name} on port {cport}...")
         proc = await asyncio.create_subprocess_exec(
-            python,
-            "-m",
-            "rcn_web",
-            recon_dir_path,
-            "--port",
-            str(cport),
+            python, "-m", "rcn_web", recon_dir_path, "--port", str(cport),
             env={**os.environ, "PYTHONPATH": python_path},
         )
 

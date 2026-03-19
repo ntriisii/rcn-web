@@ -269,7 +269,7 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
             app = item.get("parent")
             if app:
                 global_add_annotation(
-                    None,
+                    "web-apps",
                     "nuclei-scanning",
                     f"scan-result:{source_id}",
                     "finished",
@@ -289,8 +289,7 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
     ) as unscanned:
         print(f"[DEBUG] mcp_ai_perform_scanning unscanned={unscanned}")
         if unscanned:
-            for item in unscanned.values():
-                await _process_mcp_scanning_annotation(item)
+            for item in unscanned.values(): await _process_mcp_scanning_annotation(item)
 
 
 @rcn_event()

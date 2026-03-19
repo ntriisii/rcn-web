@@ -3,7 +3,7 @@ import requests
 import json
 
 BASE_URL = "http://localhost:8023/new-target"
-APP_NAME = "portal.staging8.ns.epam.lvh.me:80"
+APP_NAME = "zt.portal8.www.epam.lvh.me:80"
 
 
 def trigger_scan():

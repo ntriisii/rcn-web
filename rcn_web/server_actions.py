@@ -129,7 +129,7 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
     import string
     from rcn_web.storage.utils import get_storage, get_app_by_site
     from rcn_core.storage.bases import add_annotation
-    
+
     st = get_storage()
     if not st: return {"status": "error", "message": "Storage not initialized"}
     
@@ -151,7 +151,7 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
             storage_name="web-apps",
             key=source_id,
             value=wrapped_xml,
-            parent_id=app["parent_id"],
+            parent_id=app["id"],
             category=category,
         )
         
