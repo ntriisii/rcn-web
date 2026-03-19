@@ -58,19 +58,24 @@ class ScanResultsRequest(BaseModel):
 @router.post("/check_scan_results")
 async def check_scan_results(request: ScanResultsRequest):
     from rcn_web.core.utils import get_app_by_id, get_app_by_site
-    
+
     st = get_storage()
     app = None
-    if request.app_id: app = get_app_by_id(st, request.app_id)
-    if not app and request.app_site: app = get_app_by_site(st, request.app_site)
-    
-    if not app: return JSONResponse({"status": "error", "message": "App not found"})
-    
+    if request.app_id:
+        app = get_app_by_id(st, request.app_id)
+    if not app and request.app_site:
+        app = get_app_by_site(st, request.app_site)
+
+    if not app:
+        return JSONResponse({"status": "error", "message": "App not found"})
+
     results = []
-    
+
     target_storage_name = None
-    if request.scan_type == "scanning": target_storage_name = "web-apps::nuclei-scanning"
-    elif request.scan_type == "fuzzing": target_storage_name = "web-apps::fuzzing-data"
+    if request.scan_type == "scanning":
+        target_storage_name = "web-apps::nuclei-scanning"
+    elif request.scan_type == "fuzzing":
+        target_storage_name = "web-apps::fuzzing-data"
     else:
         return JSONResponse(
             {
@@ -79,46 +84,34 @@ async def check_scan_results(request: ScanResultsRequest):
             },
             status_code=404,
         )
-    
-    # Check for data
+
+    # 1. Check for finished annotation first
+    annotations_st = get_storage_create("web-apps::annotations", parent_id=app["id"])
+    key = f"scan-result:{request.source_name}"
+
+    # Check if the scan is marked as finished
+    completed = annotations_st.get_filtered(f"key = '{key}' AND value = 'finished'")
+
+    if not completed:
+        return PlainTextResponse("No new scan results found yet.", status_code=404)
+
+    # 2. If finished, fetch results from target storage
     st_obj = get_storage_create(target_storage_name, parent_id=app["id"])
     if st_obj:
         sid = st_obj.resolve_source_id(request.source_name)
         if sid:
-            entries = st_obj.get_filtered(
+            results = st_obj.get_filtered(
                 f"source_id = {sid} AND timestamp >= {request.min_timestamp}"
             )
-            if entries:
-                results.extend(entries)
-    
-    # If no results found, check for completion annotation
-    if not results and st_obj:
-        annotations_st = get_storage_create("web-apps::annotations", parent_id=app["id"])
-        if annotations_st:
-            key = f"scan-result:{request.source_name}"
-            base_storage = (
-                target_storage_name.split("::")[-1]
-                if "::" in target_storage_name
-                else target_storage_name
-            )
-            completed_annotations = annotations_st.get_filtered(
-                f"key = '{key}' AND (storage_name = '{target_storage_name}' OR storage_name = '{base_storage}')"
-            )
-            if completed_annotations:
-                annotation = completed_annotations[0]
-                results.append(
-                    {
-                        "info": "Scan completed with no results.",
-                        "value": annotation.get("value"),
-                        "source_id": request.source_name,
-                        "timestamp": annotation.get("timestamp"),
-                    }
-                )
-    
+
+    # 3. If no entries, return empty response
+    if not results:
+        return PlainTextResponse("")
+
     # Format results as text
     if not results:
         return PlainTextResponse("No new scan results found yet.", status_code=404)
-    
+
     text_output = []
     text_output.append(
         f"Scan Results for {request.source_name} (Type: {request.scan_type})"
@@ -133,7 +126,7 @@ async def check_scan_results(request: ScanResultsRequest):
         # Filter out internal keys if desired, similar to get_text_view
         internal_keys = ["source_id"]
         keys = [k for k in keys if k not in internal_keys]
-        
+
         text_output.append("each line of entry in this storage consists of:")
         for k in keys:
             text_output.append(k)
@@ -141,7 +134,7 @@ async def check_scan_results(request: ScanResultsRequest):
         text_output.append("and it will be seperated by ##")
         text_output.append("")
         text_output.append("DATA:")
-        
+
         entry_blocks = []
         for row in results:
             entry_lines = []
@@ -153,4 +146,3 @@ async def check_scan_results(request: ScanResultsRequest):
         text_output.append("\n##\n".join(entry_blocks))
 
     return PlainTextResponse("\n".join(text_output))
-

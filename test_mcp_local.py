@@ -4,6 +4,74 @@ import os
 import time
 from unittest.mock import MagicMock
 
+# Mock missing dependencies in the environment
+MOCK_MODULES = [
+    "ruamel",
+    "ruamel.yaml",
+    "pydantic",
+    "fastapi",
+    "fastapi.responses",
+    "validators",
+    "aiohttp",
+    "aiohttp.client_reqrep",
+    "multidict",
+    "aiofiles",
+    "bs4",
+    "bs4.element",
+    "httpx",
+    "requests",
+    "xmltodict",
+    "chepy",
+    "chepy.core",
+    "jq",
+    "yaml",
+    "psutil",
+    "selenium",
+    "selenium.webdriver",
+    "selenium.webdriver.chrome.options",
+    "selenium.webdriver.common.by",
+    "selenium.webdriver.support.ui",
+    "selenium.webdriver.support",
+    "selenium.common.exceptions",
+    "webdriver_manager",
+    "webdriver_manager.chrome",
+    "fake_useragent",
+    "google",
+    "google.genai",
+    "google.generativeai",
+    "openai",
+    "anthropic",
+    "google.oauth2",
+    "google_auth_oauthlib",
+    "googleapiclient",
+    "groq",
+    "mistralai",
+    "ipwhois",
+    "tqdm",
+    "rich",
+    "rich.logging",
+    "rich.console",
+    "rich.table",
+    "rich.panel",
+    "rich.live",
+    "rich.progress",
+    "rich.markdown",
+    "shodan",
+    "censys",
+    "spyse",
+    "vizydrop",
+    "aiohttp_socks",
+    "censys.search",
+    "ipwhois.ipwhois",
+    "mitmproxy",
+    "mitmproxy.http",
+    "mitmproxy.core",
+]
+for mod in MOCK_MODULES:
+    if mod not in sys.modules:
+        sys.modules[mod] = MagicMock()
+
+
 # Mock xxhash
 class MockXXHash:
     def xxh32(self, data, seed=0):
@@ -236,27 +304,28 @@ async def check_results_local(app_site, source_id, scan_type="scanning"):
         if scan_type == "scanning"
         else "web-apps::fuzzing-data"
     )
-    st_obj = get_storage_create(target_storage_name, parent_id=app["id"])
 
+    # 1. Check for finished annotation first
+    annotations_st = get_storage_create("web-apps::annotations", parent_id=app["id"])
+    key = f"scan-result:{source_id}"
+    completed = annotations_st.get_filtered(f"key = '{key}' AND value = 'finished'")
+
+    if not completed:
+        return "No new scan results found yet."
+
+    # 2. If finished, fetch results from target storage
     results = []
+    st_obj = get_storage_create(target_storage_name, parent_id=app["id"])
     if st_obj:
         sid = st_obj.resolve_source_id(source_id)
         if sid:
-            results.extend(st_obj.get_filtered(f"source_id = {sid}"))
+            results = st_obj.get_filtered(f"source_id = {sid}")
 
-    if not results and st_obj:
-        annotations_st = get_storage_create(
-            "web-apps::annotations", parent_id=app["id"]
-        )
-        if annotations_st:
-            key = f"scan-result:{source_id}"
-            completed = annotations_st.get_filtered(f"key = '{key}'")
-            if completed:
-                results.append(
-                    {"info": "Scan completed.", "value": completed[0].get("value")}
-                )
+    # 3. If no entries, return empty response
+    if not results:
+        return ""
 
-    return f"Found {len(results)} results." if results else "No results found."
+    return f"Found {len(results)} results."
 
 
 async def main():
@@ -296,7 +365,7 @@ async def main():
     app = get_app_by_site(get_storage(), APP_NAME)
     add_annotation(
         entry_id=app["id"],
-        storage_name="nuclei-scanning",
+        storage_name="web-apps",
         key=f"scan-result:{source_id}",
         value="finished",
         parent_id=app["id"],

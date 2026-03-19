@@ -269,8 +269,8 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
             app = item.get("parent")
             if app:
                 global_add_annotation(
+                    app["id"],
                     "web-apps",
-                    "nuclei-scanning",
                     f"scan-result:{source_id}",
                     "finished",
                     app["id"],
@@ -289,7 +289,8 @@ async def mcp_ai_perform_scanning(event, scheduled_md):
     ) as unscanned:
         print(f"[DEBUG] mcp_ai_perform_scanning unscanned={unscanned}")
         if unscanned:
-            for item in unscanned.values(): await _process_mcp_scanning_annotation(item)
+            for item in unscanned.values():
+                await _process_mcp_scanning_annotation(item)
 
 
 @rcn_event()
@@ -407,8 +408,8 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
 
             # Add completion annotation
             global_add_annotation(
-                None,
-                "fuzzing-data",
+                app["id"],
+                "web-apps",
                 f"scan-result:{source_id}",
                 "finished",
                 app["id"],
@@ -418,8 +419,8 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
         except Exception as e:
             if app:
                 global_add_annotation(
-                    None,
-                    "fuzzing-data",
+                    app["id"],
+                    "web-apps",
                     f"scan-result:{source_id}",
                     "finished",
                     app["id"],
