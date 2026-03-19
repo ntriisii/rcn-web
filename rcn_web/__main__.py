@@ -13,6 +13,10 @@ from rcn_core.parse_yaml import load_files
 from rcn_core.log import rlog
 from rcn_core.storage.target_storage import MultiTargetStorage
 
+# Import modules that register @rcn_event functions BEFORE loading YAML
+# This ensures the functions are available in YAML_CONTEXT when load_files is called
+import rcn_web.scanning.mcp_scanners
+
 
 # Data needs to be loaded before APP
 def init_config():
