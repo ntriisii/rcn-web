@@ -94,6 +94,13 @@ async def run_time_events():
     await TimeEvent().fire()
 
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    from rcn_core.globals import cleanup
+
+    await cleanup()
+
+
 @app.get("/forceDumpData")
 async def force_dump_data() -> JSONResponse:
     await get_storage().dump_data(force=True)
