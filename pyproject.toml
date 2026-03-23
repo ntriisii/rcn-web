@@ -15,6 +15,13 @@ dependencies = [
     "rcn_core @ file:///home/ahmed/programming-projects/python/rcn-core",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov"
+]
+
 [tool.setuptools]
 packages = ["rcn_web"]
 
