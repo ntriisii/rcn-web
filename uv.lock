@@ -2100,6 +2100,7 @@ dependencies = [
     { name = "pentest-utils" },
     { name = "rcn-core" },
     { name = "uvicorn" },
+    { name = "validators" },
     { name = "watchdog" },
 ]
 
@@ -2122,6 +2123,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "rcn-core", editable = "../rcn-core" },
     { name = "uvicorn" },
+    { name = "validators" },
     { name = "watchdog" },
 ]
 provides-extras = ["dev"]
