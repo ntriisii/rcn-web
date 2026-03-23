@@ -337,17 +337,7 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                 return
 
             wordlists = []  # l2, l3, ...
-
-            # Handle l1 (URLs)
             l1_file = None
-            if len(target_urls) > 0:
-                rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
-                l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
-                async with aiof.open(l1_file, "w") as f:
-                    await f.write("\n".join(target_urls))
-
-                # Prepend URL list as first wordlist (l1)
-                wordlists.append("file://" + l1_file)
 
             for w in s.find_all("wordlist"):
                 path = w.text.strip()
@@ -380,6 +370,14 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
                                 wordlists.append("file://" + wl_file)
                 except Exception as e:
                     print(f"[AI-SCAN] Error executing dynamic code: {e}")
+
+            # If there are target URLs and other wordlists (from <wordlist> tags or dynamic code), create a temporary file as a wordlist (l1)
+            if target_urls and wordlists:
+                rand_str = "".join(random.choices(string.ascii_lowercase, k=8))
+                l1_file = f"/tmp/fuzz_l1_{rand_str}.txt"
+                async with aiof.open(l1_file, "w") as f:
+                    await f.write("\n".join(target_urls))
+                wordlists.insert(0, "file://" + l1_file)
 
             if not wordlists:
                 print(f"[AI-SCAN] No wordlists for fuzzing {target_urls[0]}")
