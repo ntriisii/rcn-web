@@ -11,9 +11,9 @@ from .utils import *
 
 # from .proxy import *
 # from .viewers import *
-from .events import *
-from .test_events import *
-from .remote_flow_processor import *
+# from .events import *
+# from .test_events import *
+# from .remote_flow_processor import *
 # from .flows import *
 
 from rcn_core.utils import *
@@ -69,7 +69,6 @@ def add_dict(dc, key, val):
 
 
 def update_dict(dc, new):
-
     for i in new:
         if i not in dc.keys():
             dc[i] = new[i]
@@ -110,7 +109,6 @@ def store_domains_in_file(domains):
 
 
 def get_proxy_data():
-
     proxy_config = rcn_core.globals.YAML_FILE_CONTENT
 
     # preprocess the content file
@@ -130,7 +128,6 @@ RE_UPDATE_PROXY = True
 
 
 async def proxy_snyc(event):
-
     global RE_UPDATE_PROXY
 
     try:

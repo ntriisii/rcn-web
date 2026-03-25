@@ -1,4 +1,8 @@
 import pytest  # type: ignore
+import asyncio
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 from unittest.mock import AsyncMock, MagicMock
 from pathlib import Path
 
@@ -16,6 +20,15 @@ class MockTargetStorage:
         self.storage_md_del = AsyncMock()
         self.storage_md_exists = AsyncMock(return_value=False)
         # Add any additional async stubs as needed
+
+
+@pytest.fixture
+def event_loop():
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture
