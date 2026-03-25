@@ -1,48 +1,27 @@
 import click
-import json
-import random
-import requests
+import subprocess
+import shlex
 
 
 @click.command()
 @click.option("--app", required=True, help="Application name")
-@click.option("--xml", required=True, help="Config XML")
+@click.option("--template", help="Nuclei template")
 @click.pass_context
-def scan(ctx, app, xml):
-    """Schedule a scan for an application using provided XML config."""
-    base_url = ctx.obj["base_url"]
-    payload = {
-        "app_name": [app],
-        "storage_name": ["web-apps"],
-        "entry_id": app,
-        "key": "tool-scanning",
-        "value": f"<root><source_id>cli-scan-{random.randint(1000, 9999)}</source_id>{xml}</root>",
-    }
-    try:
-        resp = requests.post(f"{base_url}/storage/addEntryAnnotation", json=payload)
-        resp.raise_for_status()
-        click.echo("Scan scheduled.")
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
+def scan(ctx, app, template):
+    """Run nuclei scan using rr command."""
+    cmd = f"rr nuclei -u {app}"
+    if template:
+        cmd += f" -t {template}"
+    subprocess.run(shlex.split(cmd), check=True)
 
 
 @click.command()
 @click.option("--app", required=True, help="Application name")
-@click.option("--xml", required=True, help="Config XML")
+@click.option("--wordlist", help="Wordlist for fuzzing")
 @click.pass_context
-def fuzz(ctx, app, xml):
-    """Schedule a fuzzing job for an application using provided XML config."""
-    base_url = ctx.obj["base_url"]
-    payload = {
-        "app_name": [app],
-        "storage_name": ["web-apps"],
-        "entry_id": app,
-        "key": "tool-fuzzing",
-        "value": f"<root><source_id>cli-fuzz-{random.randint(1000, 9999)}</source_id>{xml}</root>",
-    }
-    try:
-        resp = requests.post(f"{base_url}/storage/addEntryAnnotation", json=payload)
-        resp.raise_for_status()
-        click.echo("Fuzzing scheduled.")
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
+def fuzz(ctx, app, wordlist):
+    """Run ffuf fuzzing using rr command."""
+    cmd = f"rr ffuf -u {app}/FUZZ"
+    if wordlist:
+        cmd += f" -w {wordlist}"
+    subprocess.run(shlex.split(cmd), check=True)
