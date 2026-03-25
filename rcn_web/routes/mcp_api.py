@@ -57,3 +57,58 @@ async def action_endpoint(payload: dict):
 
     result = execute_action(payload)
     return JSONResponse(result)
+
+
+@router.post("/describe-target")
+async def describe_target(payload: dict):
+    """Describe target and return storage preview information."""
+    # Lazy imports to avoid circular dependencies
+    from rcn_web.core.utils import get_storage
+    from rcn_core.storage.bases import get_storage_create
+    from rcn_web.core.utils import web_match_storage
+
+    target_id = payload.get("target")
+    # Retrieve the current target storage (ignoring target_id for now)
+    target_storage = get_storage()
+    if not target_storage:
+        return JSONResponse({"error": "No target storage found"}, status_code=404)
+
+    # Basic target metadata (fallback to None if attributes missing)
+    target_info = {
+        "id": getattr(target_storage, "id", None),
+        "site": getattr(target_storage, "site", None),
+    }
+
+    storages_to_preview = [
+        "web-apps",
+        "web-apps::app-links",
+        "web-apps::js-links",
+        "web-apps::annotations",
+        "flows",
+    ]
+
+    storage_previews = {}
+    for storage_name in storages_to_preview:
+        try:
+            if storage_name == "flows":
+                # web_match_storage returns list of dicts with storage key
+                matches = web_match_storage("flows")
+                st = matches[0]["storage"] if matches else None
+            else:
+                st = get_storage_create(storage_name)
+            if st is None:
+                storage_previews[storage_name] = {"count": 0, "columns": []}
+                continue
+            count = len(st)
+            entries = st.get()
+            columns = list(entries[0].keys()) if entries else []
+            storage_previews[storage_name] = {"count": count, "columns": columns}
+        except Exception as e:
+            storage_previews[storage_name] = {
+                "count": 0,
+                "columns": [],
+                "error": str(e),
+            }
+
+    result = {"target": target_info, "storages": storage_previews}
+    return JSONResponse(result)

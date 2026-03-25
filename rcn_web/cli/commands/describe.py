@@ -9,9 +9,9 @@ import requests
 def describe_target(ctx, target):
     """Describe target and show available storages."""
     base_url = ctx.obj["base_url"]
-    payload = {"identifiers": [target]}
+    payload = {"target": target}
     try:
-        resp = requests.post(f"{base_url}/apps/preview_apps", json=payload)
+        resp = requests.post(f"{base_url}/mcp/describe-target", json=payload)
         resp.raise_for_status()
         click.echo(json.dumps(resp.json(), indent=2))
     except Exception as e:

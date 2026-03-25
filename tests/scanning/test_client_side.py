@@ -1,4 +1,4 @@
-"""Tests for scan_client_side_reflected_content in rcn_web/scanning/client_side.py."""
+""" Tests for scan_client_side_reflected_content in rcn_web/scanning/client_side.py. """
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
