@@ -17,40 +17,13 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client():
-    import types, sys
-    import importlib
-
-    fastapi_utils = types.ModuleType("fastapi_utils")
-    tasks = types.ModuleType("fastapi_utils.tasks")
-
-    def dummy_repeat_every(*args, **kwargs):
-        def decorator(func):
-            return func
-
-        return decorator
-
-    tasks.repeat_every = dummy_repeat_every
-    fastapi_utils.tasks = tasks
-    sys.modules["fastapi_utils"] = fastapi_utils
-    sys.modules["fastapi_utils.tasks"] = tasks
-    import types as _types
-
-    responses_mod = _types.ModuleType("fastapi.responses")
-    try:
-        from fastapi.responses import JSONResponse as _JSONResponse
-    except Exception:
-
-        class _JSONResponse:
-            pass
-
-    responses_mod.JSONResponse = _JSONResponse
-    responses_mod.HTMLResponse = _JSONResponse
-    sys.modules["fastapi.responses"] = responses_mod
     from fastapi import FastAPI
     from rcn_web.routes.storage import router as storage_router
+    from rcn_web.routes.mcp_api import router as mcp_router
 
     app = FastAPI()
     app.include_router(storage_router)
+    app.include_router(mcp_router)
     client = TestClient(app=app)
     yield client
 
@@ -130,16 +103,51 @@ class TestStorageAddEntryAnnotation:
 class TestMcpPreviewGeneric:
     """Tests for /mcp/preview/generic endpoint."""
 
-    pass
+    def test_preview_happy_path(self, client):
+        mock_preview = {"count": 100, "columns": ["id", "url", "status"]}
+        with patch("rcn_core.mcp.api.preview_storage", return_value=mock_preview):
+            response = client.post(
+                "/mcp/preview/generic",
+                json={"type": "web-apps::app-links"},
+            )
+            assert response.status_code == 200
+            assert response.json() == mock_preview
 
 
 class TestMcpViewGeneric:
     """Tests for /mcp/view/generic endpoint."""
 
-    pass
+    def test_view_happy_path(self, client):
+        mock_data = [
+            {"id": "entry-1", "url": "https://example.com/page1"},
+            {"id": "entry-2", "url": "https://example.com/page2"},
+        ]
+        with patch("rcn_core.mcp.api.view_storage", return_value=mock_data):
+            response = client.post(
+                "/mcp/view/generic",
+                json={"type": "web-apps::app-links", "page": 1, "limit": 100},
+            )
+            assert response.status_code == 200
+            assert response.json() == mock_data
 
 
 class TestMcpAction:
     """Tests for /mcp/action endpoint."""
 
-    pass
+    def test_action_delegate_to_acp(self, client):
+        mock_result = {"status": "success", "task_id": "task-123"}
+        with patch("rcn_core.mcp.api.execute_action", return_value=mock_result):
+            response = client.post(
+                "/mcp/action",
+                json={
+                    "action": "delegate_to_acp",
+                    "params": {
+                        "app_name": "example.com",
+                        "agent_name": "gemini-3-flash",
+                        "instructions": "Analyze JS files",
+                        "storage_name": "web-apps::js-links",
+                    },
+                },
+            )
+            assert response.status_code == 200
+            assert response.json() == mock_result
