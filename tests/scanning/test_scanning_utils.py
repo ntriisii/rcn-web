@@ -12,6 +12,8 @@ Each handler is tested for:
 """
 
 import pytest
+
+pytest_plugins = ["pytest_asyncio"]
 from unittest.mock import MagicMock, AsyncMock, patch
 import json
 
@@ -335,7 +337,7 @@ async def test_nuclei_scan_apps_happy_path(mock_event, mock_scheduled_md):
     from rcn_web.scanning.utils import nuclei_scan_apps
     import rcn_web.scanning.utils as utils_module
 
-    utils_module.nuclei_args = ""
+    utils_module.nuclei_args = ""  # type: ignore
 
     mock_entries = {
         "entry-1": {
@@ -425,7 +427,7 @@ async def test_nuclei_scan_apps_no_app_found(mock_event, mock_scheduled_md):
     from rcn_web.scanning.utils import nuclei_scan_apps
     import rcn_web.scanning.utils as utils_module
 
-    utils_module.nuclei_args = ""
+    utils_module.nuclei_args = ""  # type: ignore
 
     mock_entries = {
         "entry-1": {
@@ -620,7 +622,9 @@ async def test_application_fuzzing_with_valid_200_outliers(
             AsyncMock(return_value=ffuf_results),
         ),
         patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
-        patch("aiohttp.ClientSession", return_value=mock_session),
+        patch(
+            "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
+        ),
     ):
         await application_fuzzing(mock_event_with_wordlists, mock_scheduled_md)
 
@@ -683,7 +687,9 @@ async def test_application_fuzzing_aiohttp_error(mock_event, mock_scheduled_md):
             AsyncMock(return_value=ffuf_results),
         ),
         patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
-        patch("aiohttp.ClientSession", return_value=mock_session),
+        patch(
+            "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
+        ),
     ):
         await application_fuzzing(mock_event_with_wordlists, mock_scheduled_md)
 
@@ -756,7 +762,9 @@ async def test_application_fuzzing_with_valid_200_outliers(
             AsyncMock(return_value=ffuf_results),
         ),
         patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
-        patch("aiohttp.ClientSession", return_value=mock_session),
+        patch(
+            "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
+        ),
     ):
         await application_fuzzing(mock_event_with_wordlists, mock_scheduled_md)
 
@@ -797,10 +805,13 @@ async def test_application_fuzzing_aiohttp_error(mock_event, mock_scheduled_md):
     ]
 
     mock_session = MagicMock()
+    # Ensure any awaited .text calls on a response raise aiohttp.ClientError
+    mock_response = MagicMock()
+    # .text will raise when awaited
+    mock_response.text = AsyncMock(side_effect=aiohttp.ClientError("Connection error"))
     mock_get_context = MagicMock()
-    mock_get_context.__aenter__ = AsyncMock(
-        side_effect=aiohttp.ClientError("Connection error")
-    )
+    # __aenter__ returns the mock_response
+    mock_get_context.__aenter__ = AsyncMock(return_value=mock_response)
     mock_get_context.__aexit__ = AsyncMock(return_value=None)
     mock_session.get = MagicMock(return_value=mock_get_context)
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
@@ -820,7 +831,9 @@ async def test_application_fuzzing_aiohttp_error(mock_event, mock_scheduled_md):
             AsyncMock(return_value=ffuf_results),
         ),
         patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
-        patch("aiohttp.ClientSession", return_value=mock_session),
+        patch(
+            "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
+        ),
     ):
         # Should not raise
         await application_fuzzing(mock_event_with_wordlists, mock_scheduled_md)

@@ -1,4 +1,3 @@
-
 import asyncio
 import time
 import random
@@ -7,10 +6,10 @@ import tempfile
 from collections import defaultdict
 from urllib.parse import urlparse
 
-from rcn_core.data_access import match_storage
-from rcn_core.data_access import get_unprocessed_entries, get_multi_unprocessed_entries
+from rcn_core.data_access import match_storage  # type: ignore
+from rcn_core.data_access import get_unprocessed_entries, get_multi_unprocessed_entries  # type: ignore
 from rcn_web.core.utils import add_apps, get_apps, get_uniq_apps, web_match_storage
-from rcn_core.data_access import get_storage
+from rcn_core.data_access import get_storage  # type: ignore
 
 
 def generate_random_data(num_entries, types=None):
@@ -47,7 +46,11 @@ def generate_random_data(num_entries, types=None):
                     if base_filename:
                         filename = base_filename
                     else:
-                        filename = "".join(random.choices(string.ascii_lowercase, k=random.randint(5, 15)))
+                        filename = "".join(
+                            random.choices(
+                                string.ascii_lowercase, k=random.randint(5, 15)
+                            )
+                        )
 
                     if increment:
                         filename = f"{filename}{i + 1}"
@@ -85,7 +88,7 @@ async def create_test_data(event, scheduled_md):
     """
     Tests the performance of retrieving unprocessed data using dummy data.
     """
-    
+
     scanner_name = event["name"]
     num_entries = event.get("count", 10)
     random_data = event.get("random-data", False)
@@ -102,14 +105,14 @@ async def create_test_data(event, scheduled_md):
             generated_data, k=random.randint(num_entries // 10, num_entries)
         )
         s.add_many(d, source="testsource")
-        
+
         t2 = time.time()
         add_time = t2 - t1
         t1 = time.time()
         app_entries_length = s.storage_length()
         t2 = time.time()
         get_len_time = t2 - t1
-        
+
         print(
             "Took: ",
             add_time,
@@ -121,11 +124,12 @@ async def create_test_data(event, scheduled_md):
             get_len_time,
             "to fetch the length",
         )
-        
-        if random_data: generated_data = generate_random_data(num_entries)
+
+        if random_data:
+            generated_data = generate_random_data(num_entries)
 
 
-async def test_unscanned_entries_retrieval(event, scheduled_md):
+async def handle_test_unscanned_entries_retrieval(event, scheduled_md):
     """
     Tests the performance of retrieving unscanned entries.
     """
@@ -133,7 +137,9 @@ async def test_unscanned_entries_retrieval(event, scheduled_md):
     scanner_name = event["name"]
     print(f"Testing unscanned entries retrieval for scanner: {scanner_name}")
     t1 = time.time()
-    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned_entries:
+    async with get_unprocessed_entries(
+        scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned_entries:
         t2 = time.time()
 
         if not unscanned_entries:
@@ -163,15 +169,17 @@ async def test_unscanned_entries_retrieval(event, scheduled_md):
         print("Took: ", t2 - t1, "to collect and sort entries")
 
 
-async def test_multi_storage_retrieval(event, scheduled_md):
+async def handle_test_multi_storage_retrieval(event, scheduled_md):
     """
     Tests the performance of retrieving unscanned entries from multiple storages.
     """
     scanner_name = event["name"]
     print(f"Testing multi-storage retrieval for scanner: {scanner_name}")
-    
+
     t1 = time.time()
-    async with get_multi_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned_entries:
+    async with get_multi_unprocessed_entries(
+        scanner_name, event, match_storage_fn=web_match_storage
+    ) as unscanned_entries:
         t2 = time.time()
         # print("**********************")
         # print(unscanned_entries)
@@ -179,22 +187,24 @@ async def test_multi_storage_retrieval(event, scheduled_md):
         if not unscanned_entries:
             print("No unscanned entries found.")
             return
-        
-        print(f"Took: {t2 - t1:.4f}s to get {len(unscanned_entries)} unscanned combinations.")
-        
+
+        print(
+            f"Took: {t2 - t1:.4f}s to get {len(unscanned_entries)} unscanned combinations."
+        )
+
         t1 = time.time()
         # Sort by key to be deterministic in logs if needed, though they are usually ordered by generation
         sorted_keys = sorted(unscanned_entries.keys())
-        
+
         for eid in sorted_keys:
             data = unscanned_entries[eid]
             entry_list = data.get("entry", [])
-            
+
             # Construct a summary string
             web_app = entry_list[1]["entry"]
             template = entry_list[0]["entry"]
             print(f"scanning {web_app['site']} with template {template['path']}")
-        
+
         t2 = time.time()
         print(f"Took: {t2 - t1:.4f}s to log entries")
 
@@ -205,7 +215,7 @@ async def add_custom_length_application_storage(event, scheduled_md):
     """
     # Get target storage instance
     target_storage = get_storage()
-    
+
     # Get parameters from event config
     num_apps = event.get("count", 5)  # Number of applications to create
     min_content_length = event.get("min_content_length", 100)  # Minimum content length
@@ -214,7 +224,7 @@ async def add_custom_length_application_storage(event, scheduled_md):
     print(
         f"Creating {num_apps} applications with content length between {min_content_length} and {max_content_length}"
     )
-    
+
     apps_to_add = []
     for i in range(num_apps):
         # Generate a random content length within the specified range
@@ -231,15 +241,17 @@ async def add_custom_length_application_storage(event, scheduled_md):
             "host": f"{i}.{base_domain}",
             "input": f"{i}.{base_domain}",
             "timestamp": 0,
-            "port": 443
+            "port": 443,
         }
         apps_to_add.append(app_data)
 
     # Add the applications to target storage in batch
     created_apps = add_apps(target_storage, apps_to_add)
-    
+
     for app in created_apps:
-        print(f"Added application {app['site']} with content length: {app['content_length']}")
+        print(
+            f"Added application {app['site']} with content length: {app['content_length']}"
+        )
 
     print(len(get_uniq_apps(get_storage())), len(get_apps(get_storage())))
     print(f"Successfully added {num_apps} applications with custom content lengths")

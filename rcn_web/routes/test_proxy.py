@@ -1,4 +1,3 @@
-
 import asyncio
 import random
 import string
@@ -62,7 +61,6 @@ async def param_miner_test(req: Request):
         or any(i.lower() in headers.keys() for i in test_headers)
         or any(i in body for i in test_body)
     ):
-
         return JSONResponse({}, status_code=404)
 
 
@@ -162,7 +160,6 @@ csrf_tokens = []
 async def csrf_token_json_response(
     request: Request,
 ):  # from rcn_core.storage.bases import BasicDataStorage
-
     # return JSONResponse(content)
     csrf_token = "".join(random.choice(string.ascii_letters) for i in range(40))
     csrf_tokens.append(csrf_token)
@@ -173,7 +170,6 @@ async def csrf_token_json_response(
 async def csrf_token_response(
     request: Request,
 ):  # from rcn_core.storage.bases import BasicDataStorage
-
     # return JSONResponse(content)
     csrf_token = "".join(random.choice(string.ascii_letters) for i in range(40))
     return HTMLResponse(
@@ -208,8 +204,7 @@ async def csrf_token_response(
 @router.patch("/testRequest")
 @router.head("/testRequest")
 @router.options("/testRequest")
-async def test_request(request: Request):
-
+async def handle_test_request(request: Request):
     # Get request data
     ctx = "html"
     method = request.method
@@ -257,7 +252,6 @@ def generate_xss_test_content(params, method, headers, body, ctx):
     # Create parameter reflections in different contexts
     param_reflections = []
     for key, value in params.items():
-
         # HTML comment context
         if ctx == "comment":
             param_reflections.append(f"<!-- {value} -->")
@@ -379,11 +373,11 @@ def generate_xss_test_content(params, method, headers, body, ctx):
             <h2>Raw Request Data</h2>
             <details>
                 <summary>Click to expand headers</summary>
-                <pre>{'__' or dict(headers)}</pre>
+                <pre>{"__" or dict(headers)}</pre>
             </details>
             <details>
                 <summary>Click to expand body</summary>
-                <pre>{'__' or body}</pre>
+                <pre>{"__" or body}</pre>
             </details>
         </div>
         
@@ -402,21 +396,21 @@ def generate_xss_test_content(params, method, headers, body, ctx):
     </div>
     
     <!-- Additional contexts for testing -->
-    <div id="{params.get('id', '')}">ID Attribute Context</div>
-    <div class="{params.get('class', '')}">Class Attribute Context</div>
-    <input type="text" value="{params.get('value', '')}">
-    <a href="{params.get('href', '')}">Link Context</a>
-    <img src="{params.get('src', '')}" onerror="{params.get('onerror', '')}">
+    <div id="{params.get("id", "")}">ID Attribute Context</div>
+    <div class="{params.get("class", "")}">Class Attribute Context</div>
+    <input type="text" value="{params.get("value", "")}">
+    <a href="{params.get("href", "")}">Link Context</a>
+    <img src="{params.get("src", "")}" onerror="{params.get("onerror", "")}">
     
     <script>
         // JavaScript context with parameters
         var testData = {{
-            "param1": "{params.get('js_param1', '')}",
-            "param2": "{params.get('js_param2', '')}"
+            "param1": "{params.get("js_param1", "")}",
+            "param2": "{params.get("js_param2", "")}"
         }};
         
         // This is for testing DOM XSS
-        document.write("{params.get('dom_param', '')}");
+        document.write("{params.get("dom_param", "")}");
     </script>
 </body>
 </html>"""

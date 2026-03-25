@@ -14,7 +14,11 @@ dependencies = [
     "validators",
 		"pentest_utils @ file:///home/ahmed/programming-projects/python/pentest-utils",
     "rcn_core @ file:///home/ahmed/programming-projects/python/rcn-core",
+    "click>=8.0",
 ]
+
+[project.scripts]
+rcn-web-interact = "rcn_web.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
