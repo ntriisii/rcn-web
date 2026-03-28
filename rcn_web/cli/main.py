@@ -29,4 +29,3 @@ cli.add_command(add.add)
 
 def main():
     cli()
-"e1c4c6692f327985bb232dff78cd4c92800dd62d"

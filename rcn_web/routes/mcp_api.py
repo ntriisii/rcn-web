@@ -1,5 +1,6 @@
 from typing import Optional, Any
 from fastapi import APIRouter
+from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 # Import placeholder functions for MCP actions
@@ -36,37 +37,38 @@ router = APIRouter(prefix="/mcp")
 
 
 @router.post("/preview/generic")
-async def preview_generic(payload: dict):
+async def preview_generic(req: Request):
     from rcn_core.mcp.api import preview_storage
-
+    payload = await req.json()
     result = preview_storage(payload)
     return JSONResponse(result)
 
 
 @router.post("/view/generic")
-async def view_generic(payload: dict):
+async def view_generic(req: Request):
     from rcn_core.mcp.api import view_storage
-
+    payload = await req.json()
     result = view_storage(payload)
     return JSONResponse(result)
 
 
 @router.post("/action")
-async def action_endpoint(payload: dict):
+async def action_endpoint(req: Request):
     from rcn_core.mcp.api import execute_action
-
+    payload = await req.json()
     result = execute_action(payload)
     return JSONResponse(result)
 
 
 @router.post("/describe-target")
-async def describe_target(payload: dict):
+async def describe_target(req: Request):
     """Describe target and return storage preview information."""
     # Lazy imports to avoid circular dependencies
     from rcn_web.core.utils import get_storage
     from rcn_core.storage.bases import get_storage_create
     from rcn_web.core.utils import web_match_storage
-
+    
+    payload = await req.json()
     target_id = payload.get("target")
     # Retrieve the current target storage (ignoring target_id for now)
     target_storage = get_storage()
