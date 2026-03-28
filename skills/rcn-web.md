@@ -1,6 +1,6 @@
 ---
 name: rcn-web
-description: Comprehensive reconnaissance and scanning management interface for the RCN Web platform. Use when the user needs to browse discovered applications, explore hierarchical reconnaissance data, or orchestrate automated security scans (Nuclei/FFUF).
+description: Use when the user needs to browse discovered applications, explore hierarchical reconnaissance data, or orchestrate automated security scans (Nuclei/FFUF) on the RCN Web platform.
 ---
 
 # RCN Web Reconnaissance Platform
@@ -79,13 +79,13 @@ Examples:
 rcn-web-interact my_target preview --storage "web-apps"
 
 # Preview with filter (use entry['<column_name>'] syntax)
-rcn-web-interact preview --storage "web-apps" --filter "entry['status_code'] == 200"
+rcn-web-interact <target_name> preview --storage "web-apps" --filter "entry['status_code'] == 200"
 
 # Preview with pagination
-rcn-web-interact preview --storage "web-apps" --page 1 --limit 50
+rcn-web-interact <target_name> preview --storage "web-apps" --page 1 --limit 50
 
 # Preview app-specific storage
-rcn-web-interact preview --storage "web-apps::js-links" --filter "entry['site'] == 'example.com'"
+rcn-web-interact <target_name> preview --storage "web-apps::js-links" --filter "entry['site'] == 'example.com'"
 ```
 
 **Preview shows:**
@@ -97,7 +97,7 @@ rcn-web-interact preview --storage "web-apps::js-links" --filter "entry['site'] 
 **View entries in any storage:**
 ```bash
 # Note: Use entry['<column_name>'] syntax for all filters
-rcn-web-interact view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
+rcn-web-interact <target_name> view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
 ```
 
 All storages support `--filter`, `--page`, and `--limit` parameters uniformly. The columns returned in the view correspond to the fields inside the `entry` dictionary.
@@ -105,24 +105,24 @@ All storages support `--filter`, `--page`, and `--limit` parameters uniformly. T
 Examples:
 ```bash
 # View applications (generic approach - works on all storages)
-rcn-web-interact view --storage "web-apps"
-rcn-web-interact view --storage "web-apps" --filter "entry['status_code'] == 200" --limit 100
-rcn-web-interact view --storage "web-apps" --filter "entry['technologies'].contains('React')" --page 2 --limit 50
+rcn-web-interact <target_name> view --storage "web-apps"
+rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['status_code'] == 200" --limit 100
+rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['technologies'].contains('React')" --page 2 --limit 50
 
 # View links for a specific app
-rcn-web-interact view --storage "web-apps::app-links" --filter "entry['site'] == 'example.com'"
+rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['site'] == 'example.com'"
 
 # Filter for specific patterns
-rcn-web-interact view --storage "web-apps::js-links" --filter "entry['url'].contains('api/v1')"
+rcn-web-interact <target_name> view --storage "web-apps::js-links" --filter "entry['url'].contains('api/v1')"
 
 # Filter for 403 pages
-rcn-web-interact view --storage "web-apps::app-links" --filter "entry['status'] == 403"
+rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['status'] == 403"
 
 # View nuclei scan results with pagination
-rcn-web-interact view --storage "web-apps::nuclei-scanning" --filter "entry['site'] == 'example.com'" --page 1 --limit 20
+rcn-web-interact <target_name> view --storage "web-apps::nuclei-scanning" --filter "entry['site'] == 'example.com'" --page 1 --limit 20
 
 # View fuzzing results
-rcn-web-interact view --storage "web-apps::fuzzing-data" --filter "entry['status'] == 200" --limit 100
+rcn-web-interact <target_name> view --storage "web-apps::fuzzing-data" --filter "entry['status'] == 200" --limit 100
 ```
 
 #### Annotations System
@@ -135,7 +135,7 @@ The annotation system is a centralized meta-layer for tagging entries, tracking 
 
 **Add an annotation to an entry:**
 ```bash
-rcn-web-interact annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
+rcn-web-interact <target_name> annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
 ```
 
 **Standard Categories:**
@@ -152,23 +152,23 @@ rcn-web-interact annotate --storage <storage> --entry-id <id> --category <cat> -
 **Examples:**
 ```bash
 # Mark potential vulnerability (category is MANDATORY)
-rcn-web-interact annotate --storage "web-apps::app-links" --entry-id 456 --category "potential-vuln" --key "sqli" --value "Possible SQL injection in search parameter"
+rcn-web-interact <target_name> annotate --storage "web-apps::app-links" --entry-id 456 --category "potential-vuln" --key "sqli" --value "Possible SQL injection in search parameter"
 
 # Add finding
-rcn-web-interact annotate --storage "web-apps::js-links" --entry-id 789 --category "finding" --key "api-key" --value "Found hardcoded AWS key in main.js: AKIA..."
+rcn-web-interact <target_name> annotate --storage "web-apps::js-links" --entry-id 789 --category "finding" --key "api-key" --value "Found hardcoded AWS key in main.js: AKIA..."
 
 # Add TODO
-rcn-web-interact annotate --storage "web-apps" --entry-id 123 --category "todo" --key "scan" --value "Run nuclei scan on admin endpoints"
+rcn-web-interact <target_name> annotate --storage "web-apps" --entry-id 123 --category "todo" --key "scan" --value "Run nuclei scan on admin endpoints"
 
 # Delegate to ACP agent (special format)
-rcn-web-interact annotate --storage "web-apps::js-links" --entry-id 101 --category "acp-agent-do" --key "gemini-3-flash" --value "<instruction>Analyze JS for API endpoints</instruction>"
+rcn-web-interact <target_name> annotate --storage "web-apps::js-links" --entry-id 101 --category "acp-agent-do" --key "gemini-3-flash" --value "<instruction>Analyze JS for API endpoints</instruction>"
 ```
 
 #### ACP Delegation
 
 **Delegate tasks to background agents:**
 ```bash
-rcn-web-interact delegate --app <name> --agent <agent_name> --instructions "<text>" --storage <storage_name> [--entry-ids <ids>]
+rcn-web-interact <target_name> delegate --app <name> --agent <agent_name> --instructions "<text>" --storage <storage_name> [--entry-ids <ids>]
 ```
 
 Available agents:
@@ -178,10 +178,10 @@ Available agents:
 Examples:
 ```bash
 # Delegate JS analysis
-rcn-web-interact delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all js-links for hardcoded credentials and internal staging URLs." --storage "web-apps::js-links"
+rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all js-links for hardcoded credentials and internal staging URLs." --storage "web-apps::js-links"
 
 # Delegate specific entries
-rcn-web-interact delegate --app "example.com" --agent "gemini-3" --instructions "Check these endpoints for IDOR vulnerabilities" --storage "web-apps::app-links" --entry-ids "1,2,3"
+rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3" --instructions "Check these endpoints for IDOR vulnerabilities" --storage "web-apps::app-links" --entry-ids "1,2,3"
 ```
 
 #### Running Security Tools with rr
