@@ -5,14 +5,13 @@ RCN_SERVER_URL = os.environ.get("RCN_WEB_URL", "http://localhost:8023")
 
 
 @click.group()
+@click.argument("target")
 @click.option("--base-url", default=RCN_SERVER_URL, help="RCN server URL")
-@click.option("--target", "-t", help="Target name")
 @click.pass_context
-def cli(ctx, base_url, target):
+def cli(ctx, target, base_url):
   """RCN Web CLI tool."""
   ctx.ensure_object(dict)
-  if target:
-    base_url = f"{base_url.rstrip('/')}/{target}"
+  base_url = f"{base_url.rstrip('/')}/{target}"
   ctx.obj["base_url"] = base_url
 
 from .commands import preview, annotate, delegate, scan, describe, add

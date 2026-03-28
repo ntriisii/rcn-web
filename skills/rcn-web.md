@@ -42,11 +42,14 @@ HTTP flows (network traffic) contain:
 
 The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions.
 
+### Arguments
+
+- `TARGET`: Target name. This is a mandatory positional argument used to route requests to the target-specific service (e.g., http://localhost:8023/<target_name>).
+
 ### Global Options
 
 All commands support the following global options:
 - `--base-url`: RCN server URL (default: http://localhost:8023)
-- `--target`, `-t`: Target name. This is used to route requests to the target-specific service (e.g., http://localhost:8023/<target_name>).
 
 ### Command Reference
 
@@ -54,7 +57,7 @@ All commands support the following global options:
 
 **Describe the target and list all available storages:**
 ```bash
-rcn-web-interact -t <target_name> describe-target
+rcn-web-interact <target_name> describe-target
 ```
 
 This command should be run FIRST when starting work. It returns (don't rerun if it has been ran before and you understand the target):
@@ -67,13 +70,13 @@ This command should be run FIRST when starting work. It returns (don't rerun if 
 **Preview storage before viewing (use to check available columns):**
 ```bash
 # Note: Use entry['<column_name>'] syntax for all filters
-rcn-web-interact -t <target_name> preview --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
+rcn-web-interact <target_name> preview --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
 ```
 
 Examples:
 ```bash
 # Preview web-apps storage (list all applications)
-rcn-web-interact -t my_target preview --storage "web-apps"
+rcn-web-interact my_target preview --storage "web-apps"
 
 # Preview with filter (use entry['<column_name>'] syntax)
 rcn-web-interact preview --storage "web-apps" --filter "entry['status_code'] == 200"
