@@ -85,7 +85,7 @@ rcn-web-interact <target_name> preview --storage "web-apps" --filter "entry['sta
 rcn-web-interact <target_name> preview --storage "web-apps" --page 1 --limit 50
 
 # Preview app-specific storage
-rcn-web-interact <target_name> preview --storage "web-apps::js-links" --filter "entry['site'] == 'example.com'"
+rcn-web-interact <target_name> preview --storage "web-apps::js-flows" --filter "entry['site'] == 'example.com'"
 ```
 
 **Preview shows:**
@@ -113,7 +113,8 @@ rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['techno
 rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['site'] == 'example.com'"
 
 # Filter for specific patterns
-rcn-web-interact <target_name> view --storage "web-apps::js-links" --filter "entry['url'].contains('api/v1')"
+rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['url'].contains('api/v1')"
+
 
 # Filter for 403 pages
 rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['status'] == 403"
@@ -155,13 +156,13 @@ rcn-web-interact <target_name> annotate --storage <storage> --entry-id <id> --ca
 rcn-web-interact <target_name> annotate --storage "web-apps::app-links" --entry-id 456 --category "potential-vuln" --key "sqli" --value "Possible SQL injection in search parameter"
 
 # Add finding
-rcn-web-interact <target_name> annotate --storage "web-apps::js-links" --entry-id 789 --category "finding" --key "api-key" --value "Found hardcoded AWS key in main.js: AKIA..."
+rcn-web-interact <target_name> annotate --storage "web-apps::js-flows" --entry-id 789 --category "finding" --key "api-key" --value "Found hardcoded AWS key in main.js: AKIA..."
 
 # Add TODO
 rcn-web-interact <target_name> annotate --storage "web-apps" --entry-id 123 --category "todo" --key "scan" --value "Run nuclei scan on admin endpoints"
 
 # Delegate to ACP agent (special format)
-rcn-web-interact <target_name> annotate --storage "web-apps::js-links" --entry-id 101 --category "acp-agent-do" --key "gemini-3-flash" --value "<instruction>Analyze JS for API endpoints</instruction>"
+rcn-web-interact <target_name> annotate --storage "web-apps::js-flows" --entry-id 101 --category "acp-agent-do" --key "gemini-3-flash" --value "<instruction>Analyze JS for API endpoints</instruction>"
 ```
 
 #### ACP Delegation
@@ -178,7 +179,7 @@ Available agents:
 Examples:
 ```bash
 # Delegate JS analysis
-rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all js-links for hardcoded credentials and internal staging URLs." --storage "web-apps::js-links"
+rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all js-flows for hardcoded credentials and internal staging URLs." --storage "web-apps::js-flows"
 
 # Delegate specific entries
 rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3" --instructions "Check these endpoints for IDOR vulnerabilities" --storage "web-apps::app-links" --entry-ids "1,2,3"
@@ -285,7 +286,7 @@ Create persistent background automations by creating scheduled functions. The sc
 name: correlate_data
 require-storage:
   - web-apps
-  - web-apps::js-links
+  - web-apps::js-flows
 ```
 
 This triggers when new entries exist in BOTH storages, providing combinations.
@@ -372,7 +373,7 @@ rcn-web-interact view --storage "web-apps::app-links" --filter "entry['site'] ==
 **Get JS files from marked apps:**
 ```bash
 rcn-apps | jq -r '.[] | .site' | while read app; do
-  rcn-web-interact view --storage "web-apps::js-links" --filter "entry['site'] == '$app'" | jq -r '.[] | .url'
+  rcn-web-interact view --storage "web-apps::js-flows" --filter "entry['site'] == '$app'" | jq -r '.[] | .url'
 done
 ```
 
@@ -406,10 +407,10 @@ rcn-web-interact view --storage "web-apps" --filter "entry['site'].contains('api
 ### Pattern 3: Storage Exploration
 ```bash
 # Preview storage to see columns
-rcn-web-interact preview --storage "web-apps::js-links"
+rcn-web-interact preview --storage "web-apps::js-flows"
 
 # View with appropriate filters
-rcn-web-interact view --storage "web-apps::js-links" --filter "entry['url'].contains('.min.js')" --limit 100
+rcn-web-interact view --storage "web-apps::js-flows" --filter "entry['url'].contains('.min.js')" --limit 100
 ```
 
 ### Pattern 4: Targeted Data Retrieval
@@ -443,7 +444,7 @@ done
 ### Pattern 7: Delegation for Deep Analysis
 ```bash
 # Delegate JS analysis to background agent
-rcn-web-interact delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all JavaScript files for: 1) Hardcoded API keys/secrets, 2) Internal endpoints/URLs, 3) Source map references, 4) Sensitive configuration data" --storage "web-apps::js-links"
+rcn-web-interact delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all JavaScript files for: 1) Hardcoded API keys/secrets, 2) Internal endpoints/URLs, 3) Source map references, 4) Sensitive configuration data" --storage "web-apps::js-flows"
 ```
 
 ## Scripting and Automation
@@ -470,7 +471,7 @@ rcn-web-interact view --storage "web-apps::app-links" --filter "(entry['site'] =
 **Check for new JS files (using annotation tracking):**
 ```bash
 #!/bin/bash
-rcn-web-interact view --storage "web-apps::js-links" --filter "entry['site'] == 'example.com'" --limit 100 | \
+rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['site'] == 'example.com'" --limit 100 | \
   jq -r '.[] | .url' | while read url; do
     echo "JS File: $url"
 done

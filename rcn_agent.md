@@ -8,7 +8,7 @@ This document provides context on the RCN Web Server environment, available stor
 The RCN Web Server organizes data into **Targets** and **Web Applications**.
 - **Target**: A scope or project containing multiple applications.
 - **Web Application**: A specific web application (e.g., `https://example.com`) **the only thing available to you are applications** targets are way of aggregating data in the server only.
-- **Storage**: Each application and target has "storages" for specific data types (e.g., `web-apps::app-links`, `web-apps::js-links`, `web-apps::app-flows`, `web-apps::trufflehog-secrets`).
+- **Storage**: Each application and target has "storages" for specific data types (e.g., `web-apps::app-links`, `web-apps::js-flows`, `web-apps::app-flows`, `web-apps::trufflehog-secrets`).
 
 ### Key Objects & Helpers
 
@@ -345,7 +345,7 @@ It is crucial to choose the right tool based on the level of detail you need:
 **Example Usage**:
 - `view_storage(storage_name='web-apps', sql_filter="status_code = 200")`
 - `view_storage(storage_name='web-apps::app-links', app_id=123, sql_filter="url LIKE '%.php%' AND status = 200")`
-- `preview_storage(app_id=123, storage_name='web-apps::js-links', sql_filter="url LIKE '%api%'")`
+- `preview_storage(app_id=123, storage_name='web-apps::js-flows', sql_filter="url LIKE '%api%'")`
 
 ### Usage Workflow
 
@@ -361,7 +361,7 @@ The primary workflow for interacting with the system is task-driven based on app
 
 3.  **Tool Selection**: Select the most appropriate tool to further your knowledge or execute the task.
     *   **Constraint**: Use as *few tools as possible*. Do not attempt to read everything "just in case."
-    *   **Targeted Action**: If a TODO says "check JS files," look specifically at `web-apps::js-links` storage using `view_storage`, rather than listing everything.
+    *   **Targeted Action**: If a TODO says "check JS files," look specifically at `web-apps::js-flows` storage using `view_storage`, rather than listing everything.
 
 4.  **Execution**: Perform the task or investigation using the selected tool.
 
@@ -400,7 +400,7 @@ from rcn_core.storage.bases import get_storage_create
 
 st = get_storage()
 app = get_app_by_site(st, "example.com")
-js_links_storage = get_storage_create("web-apps::js-links", parent_id=app['id'])
+js_flows_storage = get_storage_create("web-apps::js-flows", parent_id=app['id'])
 
 new_js_files = [
     {"url": "https://example.com/static/js/main.js", "size": 1024},
@@ -408,7 +408,7 @@ new_js_files = [
 ]
 
 # Add entries to storage
-js_links_storage.add_many(new_js_files, source="my_custom_script")
+js_flows_storage.add_many(new_js_files, source="my_custom_script")
 ```
 
 **Note:** `add_many` automatically handles ID generation and timestamping for each entry.
