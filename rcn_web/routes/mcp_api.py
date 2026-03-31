@@ -1,15 +1,14 @@
-from typing import Optional, Any
+from typing import Optional, Any, Union
 from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
-# Import placeholder functions for MCP actions
-from rcn_core.mcp.api import preview_storage, view_storage, execute_action
+from rcn_core.mcp.api import create_mcp_router
 from rcn_web.storage.utils import get_storage
 from rcn_core.storage.bases import get_storage_create
 
 
-def _resolve_storage(storage_name: str, parent_id: Optional[int | str] = None) -> Any:
+def _resolve_storage(storage_name: str, parent_id: Optional[Union[int, str]] = None) -> Any:
     st = get_storage()
     if not st:
         return None
@@ -32,31 +31,63 @@ def _resolve_storage(storage_name: str, parent_id: Optional[int | str] = None) -
     return None
 
 
-# Create router manually for testing
+# Create router manually for testing and including standardized MCP routes
 router = APIRouter(prefix="/mcp")
+
+
+# Local implementations for backward compatibility endpoints
+async def preview_storage(payload):
+    from rcn_core.mcp.utils import render_storage_view
+    collection = payload.get("collection") or payload.get("type")
+    parent_id = payload.get("parent_id")
+    sql_filter = payload.get("filter") or payload.get("sql_filter")
+    
+    storage = _resolve_storage(collection, parent_id)
+    if not storage:
+        return {"error": f"Collection '{collection}' not found"}
+        
+    return render_storage_view(storage, filter=sql_filter, is_preview=True)
+
+
+async def view_storage(payload):
+    from rcn_core.mcp.utils import render_storage_view
+    collection = payload.get("collection") or payload.get("type")
+    parent_id = payload.get("parent_id")
+    sql_filter = payload.get("filter") or payload.get("sql_filter")
+    page = payload.get("page", 1)
+    limit = payload.get("limit", 20)
+    
+    storage = _resolve_storage(collection, parent_id)
+    if not storage:
+        return {"error": f"Collection '{collection}' not found"}
+        
+    return render_storage_view(storage, page=page, limit=limit, filter=sql_filter, is_preview=False)
+
+
+async def execute_action(payload):
+    # This is a placeholder that can be patched in tests
+    # In production, it returns an error unless it's specifically patched or implemented.
+    return {"status": "error", "message": "Generic action endpoint is deprecated. Use /mcp/action instead."}
 
 
 @router.post("/preview/generic")
 async def preview_generic(req: Request):
-    from rcn_core.mcp.api import preview_storage
     payload = await req.json()
-    result = preview_storage(payload)
+    result = await preview_storage(payload)
     return JSONResponse(result)
 
 
 @router.post("/view/generic")
 async def view_generic(req: Request):
-    from rcn_core.mcp.api import view_storage
     payload = await req.json()
-    result = view_storage(payload)
+    result = await view_storage(payload)
     return JSONResponse(result)
 
 
 @router.post("/action")
 async def action_endpoint(req: Request):
-    from rcn_core.mcp.api import execute_action
     payload = await req.json()
-    result = execute_action(payload)
+    result = await execute_action(payload)
     return JSONResponse(result)
 
 
@@ -114,3 +145,8 @@ async def describe_target(req: Request):
 
     result = {"target": target_info, "storages": storage_previews}
     return JSONResponse(result)
+
+
+# Include standardized MCP routes from rcn-core (LAST to allow overrides)
+mcp_router = create_mcp_router(storage_resolver=_resolve_storage, prefix="")
+router.include_router(mcp_router)

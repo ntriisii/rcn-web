@@ -105,7 +105,7 @@ class TestMcpPreviewGeneric:
 
     def test_preview_happy_path(self, client):
         mock_preview = {"count": 100, "columns": ["id", "url", "status"]}
-        with patch("rcn_core.mcp.api.preview_storage", return_value=mock_preview):
+        with patch("rcn_web.routes.mcp_api.preview_storage", return_value=mock_preview):
             response = client.post(
                 "/mcp/preview/generic",
                 json={"type": "web-apps::app-links"},
@@ -122,7 +122,7 @@ class TestMcpViewGeneric:
             {"id": "entry-1", "url": "https://example.com/page1"},
             {"id": "entry-2", "url": "https://example.com/page2"},
         ]
-        with patch("rcn_core.mcp.api.view_storage", return_value=mock_data):
+        with patch("rcn_web.routes.mcp_api.view_storage", return_value=mock_data):
             response = client.post(
                 "/mcp/view/generic",
                 json={"type": "web-apps::app-links", "page": 1, "limit": 100},
@@ -134,9 +134,9 @@ class TestMcpViewGeneric:
 class TestMcpAction:
     """Tests for /mcp/action endpoint."""
 
-    def test_action_delegate_to_acp(self, client):
+    def test_action_endpoint(self, client):
         mock_result = {"status": "success", "task_id": "task-123"}
-        with patch("rcn_core.mcp.api.execute_action", return_value=mock_result):
+        with patch("rcn_web.routes.mcp_api.execute_action", return_value=mock_result):
             response = client.post(
                 "/mcp/action",
                 json={

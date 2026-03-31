@@ -7,6 +7,9 @@ import aiofiles as aiof
 import aiohttp
 
 
+from rcn_core.decorators import rcn_event
+
+@rcn_event()
 async def request_gau_entries(event, md=None):
     target = event.get("target")
     if target:

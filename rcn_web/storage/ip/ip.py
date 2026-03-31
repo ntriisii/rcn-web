@@ -26,6 +26,9 @@ UNPROCESSED_ASNS = []
 specific number of IPs (etc 100) as not to waste API quota. """
 
 
+from rcn_core.decorators import rcn_event
+
+@rcn_event()
 async def handle_unprocessed_ips(event):
 
     global CENSYS_SEARCH_IPS
@@ -49,6 +52,7 @@ async def handle_unprocessed_ips(event):
         ip_entries.ack_data_processed(data_id)
 
 
+@rcn_event()
 async def handle_unprocessed_asns(event):
     global UNPROCESSED_ASNS
 

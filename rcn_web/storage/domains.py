@@ -61,6 +61,9 @@ def massdns_extract_ip_info(data):
     return toreturn
 
 
+from rcn_core.decorators import rcn_event
+
+@rcn_event()
 async def handle_unprocessed_domains(event, scheduled_md):
     scanner_name = event["name"]
     target = event.get("target")
@@ -75,6 +78,7 @@ async def handle_unprocessed_domains(event, scheduled_md):
                 await flow_instance.run()
 
 
+@rcn_event()
 async def check_for_new_subdomains(event, scheduled_md, matched_storages=[]):
     rcn_flows = rcn_core.globals.RCN_FLOWS
     target = event.get("target")
