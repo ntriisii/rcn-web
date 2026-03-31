@@ -139,7 +139,7 @@ async def js_analysis_run_flow_on_files(s, paths, app_name):
                     "path": i.get("url"),
                     "source": i.get("source"),
                     "original": i.get("original"),
-                    "flow-id": None,
+                    "flow-id": str(i.get("flow-id")) if i.get("flow-id") else None,
                 }
                 for i in links
             ],

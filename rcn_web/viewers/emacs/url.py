@@ -1,6 +1,6 @@
 import sys
 import datetime
- 
+
 from pentest_utils.viewers.emacs.utils import (
     basic_match_fn,
     make_preview_tabulated_entries,
@@ -78,7 +78,7 @@ def elisp_view_app_found_sources_urls(
     collected["view-store"] = {
         "web-apps::app-links": {
             "tabulated-data": {
-                "get-ids-url": "http://localhost:8023/testing-shit",
+                "get-ids-url": "http://localhost:8023/getAppStorage",
                 "response-buffer": response_buf_name,
                 "request-buffer": request_buf_name,
             }

@@ -58,6 +58,7 @@ def elisp_view_app_flows(
     collected["view-store"] = {
         "web-apps::app-flows": {
             "tabulated-data": {
+                "get-ids-url": "http://localhost:8023/getAppStorage",
                 "response-buffer": response_buf_name,
                 "request-buffer": request_buf_name,
             }

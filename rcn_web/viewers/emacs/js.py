@@ -25,7 +25,7 @@ def elisp_view_js_flows(
         "entries": tabulated_entries,
         "is-target-storage": False,
         "storage-name": "js-flows",
-        "navigate-fn": "rcn-view-flow-navigate-fn",
+        "navigate-fn": "rcn-view-js-flow-navigate-fn",
         "paginate-fn": "rcn-view-flow--get-next-page",
         "select-fn": "rcn-view-flow-repeat-request",
         "refresh-fn": "rcn-view-flow-refresh-fn",
@@ -62,6 +62,7 @@ def elisp_view_js_flows(
     collected["view-store"] = {
         "web-apps::js-flows": {
             "tabulated-data": {
+                "get-ids-url": "http://localhost:8023/getAppStorage",
                 "response-buffer": response_buf_name,
                 "request-buffer": request_buf_name,
             },
@@ -76,7 +77,9 @@ def elisp_view_js_flows(
         return collected["window-config"]["window-1"]["entries"]
 
 
-def elisp_make_js_flows_tabulated_entries(flow_storage, *args, **kwargs):
+def elisp_make_js_flows_tabulated_entries(
+    flow_storage, match_groups=None, *args, **kwargs
+):
     if not flow_storage:
         return [], ""
 
@@ -95,6 +98,7 @@ def elisp_make_js_flows_tabulated_entries(flow_storage, *args, **kwargs):
         attrs,
         include_id=False,
         additional_keys=["flow-id"],
+        match_groups=match_groups,
         *args,
         **kwargs,
     )

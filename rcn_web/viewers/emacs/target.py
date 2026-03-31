@@ -556,7 +556,6 @@ def elisp_make_app_view_data(app):
                         entries=get_storage_create(
                             "web-apps::js-flows", parent_id=app["id"]
                         ).get_data_preview(),
-                        push_btn="rcn-view-show-app-js-flows",
                         storage_name="web-apps::js-flows",
                     ),
                     *[
