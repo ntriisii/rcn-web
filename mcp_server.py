@@ -26,7 +26,7 @@ def preview_storage(
     Get a text preview of storages.
 
     Args:
-        storage_name: Storage name to preview (e.g. 'found-ips', 'js-links', 'web-apps').
+        storage_name: Storage name to preview (e.g. 'found-ips', 'js-flows', 'web-apps').
         app_id: Optional. Application ID. If provided, looks for storage within this application.
         sql_filter: Optional. SQL filter to apply to storage entries (e.g. "url LIKE '%login%'").
     """
@@ -446,7 +446,8 @@ def _perform_security_task(app_name: str, scan_type: str, config_xml: str) -> st
                     f"Scheduled {scan_type} for {app} (Response: {resp_data})"
                 )
 
-    except Exception as e: results.append(f"Connection error for {app}: {e}")
+    except Exception as e:
+        results.append(f"Connection error for {app}: {e}")
 
     if all_added_notes:
         results.append("Waiting for results (polling storage)...")
@@ -510,4 +511,5 @@ def perform_fuzzing(app_name: str, config_xml: str) -> str:
 
 
 RCN_SERVER_URL = "http://localhost:8023"
-if __name__ == "__main__": mcp.run()
+if __name__ == "__main__":
+    mcp.run()

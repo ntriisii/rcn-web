@@ -8,7 +8,9 @@ from rcn_web.storage.utils import get_storage
 from rcn_core.storage.bases import get_storage_create
 
 
-def _resolve_storage(storage_name: str, parent_id: Optional[Union[int, str]] = None) -> Any:
+def _resolve_storage(
+    storage_name: str, parent_id: Optional[Union[int, str]] = None
+) -> Any:
     st = get_storage()
     if not st:
         return None
@@ -38,36 +40,43 @@ router = APIRouter(prefix="/mcp")
 # Local implementations for backward compatibility endpoints
 async def preview_storage(payload):
     from rcn_core.mcp.utils import render_storage_view
+
     collection = payload.get("collection") or payload.get("type")
     parent_id = payload.get("parent_id")
     sql_filter = payload.get("filter") or payload.get("sql_filter")
-    
+
     storage = _resolve_storage(collection, parent_id)
     if not storage:
         return {"error": f"Collection '{collection}' not found"}
-        
+
     return render_storage_view(storage, filter=sql_filter, is_preview=True)
 
 
 async def view_storage(payload):
     from rcn_core.mcp.utils import render_storage_view
+
     collection = payload.get("collection") or payload.get("type")
     parent_id = payload.get("parent_id")
     sql_filter = payload.get("filter") or payload.get("sql_filter")
     page = payload.get("page", 1)
     limit = payload.get("limit", 20)
-    
+
     storage = _resolve_storage(collection, parent_id)
     if not storage:
         return {"error": f"Collection '{collection}' not found"}
-        
-    return render_storage_view(storage, page=page, limit=limit, filter=sql_filter, is_preview=False)
+
+    return render_storage_view(
+        storage, page=page, limit=limit, filter=sql_filter, is_preview=False
+    )
 
 
 async def execute_action(payload):
     # This is a placeholder that can be patched in tests
     # In production, it returns an error unless it's specifically patched or implemented.
-    return {"status": "error", "message": "Generic action endpoint is deprecated. Use /mcp/action instead."}
+    return {
+        "status": "error",
+        "message": "Generic action endpoint is deprecated. Use /mcp/action instead.",
+    }
 
 
 @router.post("/preview/generic")
@@ -98,7 +107,7 @@ async def describe_target(req: Request):
     from rcn_web.core.utils import get_storage
     from rcn_core.storage.bases import get_storage_create
     from rcn_web.core.utils import web_match_storage
-    
+
     payload = await req.json()
     target_id = payload.get("target")
     # Retrieve the current target storage (ignoring target_id for now)
@@ -115,7 +124,7 @@ async def describe_target(req: Request):
     storages_to_preview = [
         "web-apps",
         "web-apps::app-links",
-        "web-apps::js-links",
+        "web-apps::js-flows",
         "web-apps::annotations",
         "flows",
     ]

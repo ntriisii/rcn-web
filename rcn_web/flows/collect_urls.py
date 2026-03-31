@@ -179,13 +179,9 @@ async def handle_collected_urls(st, extractor, content):
         js_flow_storage = get_storage_create(
             "web-apps::js-flows", parent_id=app_st["id"]
         )
-        js_link_storage = get_storage_create(
-            "web-apps::js-links", parent_id=app_st["id"]
-        )
 
         app_flows_to_add = []
         js_flows_to_add = []
-        js_links_to_add = []
 
         for entry in d:
             url = entry["url"]
@@ -202,11 +198,9 @@ async def handle_collected_urls(st, extractor, content):
                 is_js = True
 
             if is_js:
-                js_flows_to_add.append({"flow-id": flow_id, "path": path})
-                # Copy the full entry for js-links to keep metadata
-                js_link_entry = entry.copy()
-                js_link_entry["path"] = path
-                js_links_to_add.append(js_link_entry)
+                js_entry = entry.copy()
+                js_entry["path"] = path
+                js_flows_to_add.append(js_entry)
 
             # save some space by removing the URL and rebuild it when required
             entry["path"] = path
@@ -219,20 +213,22 @@ async def handle_collected_urls(st, extractor, content):
             app_flow_storage.add_many(app_flows_to_add, source="proxy")
 
         if js_flows_to_add:
-            js_flow_storage.add_many(js_flows_to_add, source="proxy")
-
-        if js_links_to_add:
-            # Deduplicate js links
-            existing_js_links = {i["url"] for i in js_link_storage.get()}
-            unique_js_links = []
+            # Deduplicate js flows if they are from links (proxy entries usually have flow-id)
+            existing_js_flows = {
+                i.get("url") for i in js_flow_storage.get() if i.get("url")
+            }
+            unique_js_flows = []
             seen_urls = set()
-            for l in js_links_to_add:
-                if l["url"] not in existing_js_links and l["url"] not in seen_urls:
-                    unique_js_links.append(l)
-                    seen_urls.add(l["url"])
+            for l in js_flows_to_add:
+                u = l.get("url")
+                if u not in existing_js_flows and u not in seen_urls:
+                    unique_js_flows.append(l)
+                    seen_urls.add(u)
+                elif not u:  # if no url, just add it (standard flow)
+                    unique_js_flows.append(l)
 
-            if unique_js_links:
-                js_link_storage.add_many(unique_js_links, source="proxy")
+            if unique_js_flows:
+                js_flow_storage.add_many(unique_js_flows, source="proxy")
 
 
 async def collect_request_info(flow):
@@ -325,4 +321,5 @@ async def handle_collected_request_info(st, extractor, content):
             for i in rheader_keys:
                 collected.append({"value": i, "type": "request-header"})
 
-        storage.add_many(items_to_add, source="proxy")
+        # Fix: use the correct storage variable
+        req_storage.add_many(items_to_add, source="proxy")

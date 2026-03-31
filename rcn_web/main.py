@@ -220,17 +220,17 @@ async def get_app_more_data(req: Request):
                             "web-apps::fuzzing-data", parent_id=app["id"]
                         ).get()
                     ],
-                    "js-links": [
+                    "js-flows": [
                         {
                             **i,
                             "url": app.get("scheme", "http")
                             + "://"
                             + app["site"]
                             + "/"
-                            + i["url"].lstrip("/"),
+                            + (i.get("url") or i["path"]).lstrip("/"),
                         }
                         for i in get_storage_create(
-                            "web-apps::js-links", parent_id=app["id"]
+                            "web-apps::js-flows", parent_id=app["id"]
                         ).get()
                     ],
                     "nuclei-scanning": get_storage_create(
@@ -502,7 +502,7 @@ async def get_all_annotations():
         # For now, use a fixed list of common app storages since app is a dict and we don't know its storages easily.
         common_app_storages = [
             "app-links",
-            "js-links",
+            "js-flows",
             "fuzzing-data",
             "nuclei-scanning",
             "js-secrets",

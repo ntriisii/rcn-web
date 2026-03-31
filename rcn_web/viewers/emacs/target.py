@@ -96,7 +96,7 @@ from .dorks import arrange_github_dorks_views
 from .dorks import arrange_shodan_dorks_views
 
 from rcn_web import storage
-from rcn_web.core.utils import get_storage, get_uniq_apps
+from rcn_web.core.utils import get_storage, get_uniq_apps, get_app_by_site
 from rcn_web.core.scope import get_scope_wildcards
 from rcn_core.storage.bases import (
     get_storage_create,
@@ -282,7 +282,7 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         ("scanning", 3),
         ("src found", 3),
         ("secrets", 3),
-        ("jl", 3),
+        ("js flows", 3),
         ("js", 3),
     )
 
@@ -291,7 +291,7 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
         "fuzzing": "fuzzing-data",
         "scanning": "nuclei-scanning",
         "secrets": "trufflehog-secrets",
-        "jl": "js-links",
+        "js flows": "js-flows",
         "js": "js-secrets",
     }
 
@@ -310,9 +310,10 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
 
         # arrange sources data
         for attr in st_attrs:
-            src = get_storage_create(
-                "web-apps::" + storage_mapping[attr[0]], parent_id=app["id"]
-            )
+            s_name = storage_mapping.get(attr[0])
+            if not s_name:
+                continue
+            src = get_storage_create("web-apps::" + s_name, parent_id=app["id"])
             l = src.length
             v = l
             tbl[attr[0]] = v
@@ -359,7 +360,7 @@ def elisp_make_target_view_data():
 
     st = get_storage()
     org_entries = {
-        "Apps count": len(get_uniq_apps(s)),
+        "Apps count": len(get_uniq_apps(st)),
         "IPs count": st.get_storage_create("found-ips").length,
     }
 
@@ -550,6 +551,14 @@ def elisp_make_app_view_data(app):
                         ).get_data_preview(),
                         push_btn="rcn-view-show-app-flows",
                     ),
+                    elisp_make_org_headline(
+                        name="js flows",
+                        entries=get_storage_create(
+                            "web-apps::js-flows", parent_id=app["id"]
+                        ).get_data_preview(),
+                        push_btn="rcn-view-show-app-js-flows",
+                        storage_name="web-apps::js-flows",
+                    ),
                     *[
                         elisp_make_org_headline(
                             name=" ".join(i for i in ds.split("-")),
@@ -561,7 +570,6 @@ def elisp_make_app_view_data(app):
                         )
                         for ds in [
                             "app-links",
-                            "js-links",
                             "fuzzing-data",
                             "nuclei-scanning",
                             "js-secrets",

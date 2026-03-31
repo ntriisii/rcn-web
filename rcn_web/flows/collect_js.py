@@ -130,14 +130,16 @@ async def js_analysis_run_flow_on_files(s, paths, app_name):
             links.append(i)
 
     if links:
-        lst = get_storage_create("web-apps::js-links", parent_id=app["id"])
+        lst = get_storage_create("web-apps::js-flows", parent_id=app["id"])
         # Add proper source and original keys if missing, though logic implies they exist
         lst.add_many(
             [
                 {
                     "url": i.get("url"),
+                    "path": i.get("url"),
                     "source": i.get("source"),
                     "original": i.get("original"),
+                    "flow-id": None,
                 }
                 for i in links
             ],

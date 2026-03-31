@@ -190,7 +190,7 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         "fuzzing-data",
         "nuclei-scanning",
         "trufflehog-secrets",
-        "js-links",
+        "js-flows",
         "js-secrets",
     ]
     for app in all_apps:

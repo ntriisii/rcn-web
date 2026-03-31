@@ -145,7 +145,7 @@ class TestMcpAction:
                         "app_name": "example.com",
                         "agent_name": "gemini-3-flash",
                         "instructions": "Analyze JS files",
-                        "storage_name": "web-apps::js-links",
+                        "storage_name": "web-apps::js-flows",
                     },
                 },
             )

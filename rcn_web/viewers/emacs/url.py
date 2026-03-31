@@ -1,5 +1,6 @@
+import sys
 import datetime
-
+ 
 from pentest_utils.viewers.emacs.utils import (
     basic_match_fn,
     make_preview_tabulated_entries,
