@@ -112,7 +112,7 @@ async def handle_monitor_js_hash(session, semaphore, app, js_link):
                 return {
                     "url": url,
                     "hash": current_hash,
-                    "flow-id": flow_id,
+                    "flow-id": str(flow_id) if flow_id else None,
                     "last_seen": time.time(),
                     "is_third_party": is_third_party(url, content),
                     "status": "monitored",
