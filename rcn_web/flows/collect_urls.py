@@ -143,7 +143,7 @@ async def collect_url_content(flow):
             "response-length": resp_length,
             "data": req_body,
             "title": title,
-            "flow-id": flow["timestamp"],
+            "flow-id": str(flow["timestamp"]),
         }
     ]
 

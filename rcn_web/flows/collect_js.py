@@ -32,7 +32,11 @@ async def extract_js_files(flow):
 
     if is_js:
         JS_COLLECTED_FLOWS.append(
-            {"url": flow["url"], "response": flow["response-body"]}
+            {
+                "url": flow["url"],
+                "response": flow["response-body"],
+                "flow-id": str(flow["timestamp"]),
+            }
         )
 
     # Batching logic: return accumulated flows only after interval or if enough gathered
@@ -58,6 +62,7 @@ async def handle_collected_js_files(s, extractor, js_content):
 
     for site, site_entries in found_sites.items():
         temp_files = []
+        file_to_flow_map = {}
         try:
             # Write to temp files
             for entry in site_entries:
@@ -72,9 +77,12 @@ async def handle_collected_js_files(s, extractor, js_content):
                     await f.write(entry["response"])
 
                 temp_files.append(temp_path)
+                file_to_flow_map[temp_path] = entry.get("flow-id")
 
             if temp_files:
-                await js_analysis_run_flow_on_files(s, temp_files, site)
+                await js_analysis_run_flow_on_files(
+                    s, temp_files, site, file_to_flow_map=file_to_flow_map
+                )
 
         finally:
             # Cleanup temp files
@@ -86,7 +94,7 @@ async def handle_collected_js_files(s, extractor, js_content):
                     print(f"Error deleting temp file {p}: {e}")
 
 
-async def js_analysis_run_flow_on_files(s, paths, app_name):
+async def js_analysis_run_flow_on_files(s, paths, app_name, file_to_flow_map=None):
     import rcn_core.globals
 
     # Use global RCN_FLOWS directly or via storage method
@@ -132,19 +140,27 @@ async def js_analysis_run_flow_on_files(s, paths, app_name):
     if links:
         lst = get_storage_create("web-apps::js-flows", parent_id=app["id"])
         # Add proper source and original keys if missing, though logic implies they exist
-        lst.add_many(
-            [
+        links_to_add = []
+        for i in links:
+            source_file = i.get("source")
+            flow_id = None
+            if file_to_flow_map and source_file in file_to_flow_map:
+                flow_id = file_to_flow_map[source_file]
+
+            if not flow_id:
+                flow_id = str(i.get("flow-id")) if i.get("flow-id") else None
+
+            links_to_add.append(
                 {
                     "url": i.get("url"),
                     "path": i.get("url"),
                     "source": i.get("source"),
                     "original": i.get("original"),
-                    "flow-id": str(i.get("flow-id")) if i.get("flow-id") else None,
+                    "flow-id": flow_id,
                 }
-                for i in links
-            ],
-            source="jsluice",
-        )
+            )
+
+        lst.add_many(links_to_add, source="jsluice")
 
     if secrets:
         sst = get_storage_create("web-apps::js-secrets", parent_id=app["id"])
