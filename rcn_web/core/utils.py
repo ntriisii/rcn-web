@@ -374,10 +374,37 @@ class RemoteFlowsAdapter(StorageMetaData):
 
     def __init__(self):
         StorageMetaData.__init__(self)
+        try:
+            from rcn_core.data_access import get_storage
+
+            ts = get_storage()
+            self.parent_id = ts.id if ts else 1
+        except:
+            self.parent_id = 1
+        self.storage_name = "flows"
         self._cache = []
-        self._last_fetch_ts = time.time()
         self._fetch_lock = asyncio.Lock()
         self._max_cache_size = 10000
+
+        # persistence of start timestamp
+        self._server_start_ts = self.storage_md_get("server-start-timestamp")
+        if not self._server_start_ts:
+            self._server_start_ts = time.time()
+            self.storage_md_set("server-start-timestamp", self._server_start_ts)
+        else:
+            self._server_start_ts = float(self._server_start_ts)
+
+        self._last_fetch_ts = self._server_start_ts
+        asyncio.create_task(self.periodic_fetch())
+
+    @property
+    def parent_container(self):
+        try:
+            from rcn_core.data_access import get_storage
+
+            return get_storage()
+        except:
+            return None
 
     def _convert_headers(self, headers):
         m = MultiDict()
@@ -405,74 +432,7 @@ class RemoteFlowsAdapter(StorageMetaData):
         return data
 
     async def _fetch_and_update_cache(self, requester, count=100, category=None):
-        should_fetch = True
-        actual_requester = f"{requester}:{category}" if category else requester
-        if requester:
-            last_ts = float(
-                self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
-            )
-            available = sum(
-                1
-                for i in range(len(self._cache) - 1, -1, -1)
-                if float(self._cache[i].get("timestamp", 0)) > last_ts
-            )
-            if count != float("inf") and available >= count:
-                should_fetch = False
-        if should_fetch:
-            async with self._fetch_lock:
-                url = "http://localhost:8082/GetFlowsAfterTimestmp"
-                req_count = (
-                    count
-                    if isinstance(count, (int, float)) and count != float("inf")
-                    else 1000
-                )
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            url,
-                            params={
-                                "timestamp": self._last_fetch_ts,
-                                "count": req_count,
-                            },
-                        ) as resp:
-                            if resp.status == 200:
-                                flows = await resp.json()
-                                if flows:
-                                    flows.sort(
-                                        key=lambda x: float(x.get("timestamp", 0))
-                                    )
-                                    for f in flows:
-                                        self._process_flow_headers(f)
-                                    self._last_fetch_ts = float(
-                                        flows[-1].get("timestamp", 0)
-                                    )
-                                    self._cache.extend(flows)
-                except Exception as e:
-                    rlog(f"Error fetching remote flows: {e}", level="error")
-        try:
-            from rcn_core.time_event import TimeEvent
-
-            consumers = [
-                fn.fn_name
-                for fn in TimeEvent()._dispatch_fns
-                if fn.event.get("require-storage") == "flows"
-            ]
-            if not consumers:
-                if len(self._cache) > self._max_cache_size:
-                    self._cache = self._cache[-self._max_cache_size :]
-                return
-            timestamps = []
-            for c in consumers:
-                ts = self.storage_md_get(c + "-last-id-timestamp")
-                timestamps.append(float(ts) if ts is not None else 0.0)
-            if timestamps:
-                min_ts = min(timestamps)
-                if min_ts > 0:
-                    self._cache = [
-                        f for f in self._cache if float(f.get("timestamp", 0)) > min_ts
-                    ]
-        except ImportError:
-            pass
+        await self._fetch_all_required_events()
 
     @asynccontextmanager
     async def get_unprocessed_entries(self, requester, count, category=None):
@@ -513,6 +473,105 @@ class RemoteFlowsAdapter(StorageMetaData):
             except Exception as e:
                 rlog(f"Error fetching flows by ID: {e}", level="error")
         return found_flows
+
+    def add_many(self, entries):
+        if not entries:
+            return []
+
+        from rcn_core.data_access import process_new_entries_for_events
+
+        # Process headers first
+        for f in entries:
+            self._process_flow_headers(f)
+            if "id" not in f:
+                f["id"] = f.get("timestamp")
+
+        # Sort and deduplicate
+        entries.sort(key=lambda x: float(x.get("timestamp", 0)))
+
+        new_entries = []
+        if not self._cache:
+            new_entries = entries
+        else:
+            last_cache_ts = float(self._cache[-1].get("timestamp", 0))
+            new_entries = [
+                f for f in entries if float(f.get("timestamp", 0)) > last_cache_ts
+            ]
+
+        if new_entries:
+            self._cache.extend(new_entries)
+            self._last_fetch_ts = float(self._cache[-1].get("timestamp", 0))
+
+            # Trigger events
+            asyncio.create_task(process_new_entries_for_events(self, new_entries))
+
+        return new_entries
+
+    async def periodic_fetch(self):
+        while True:
+            try:
+                await self._fetch_all_required_events()
+            except Exception as e:
+                rlog(f"Error in RemoteFlowsAdapter periodic fetch: {e}", level="error")
+            await asyncio.sleep(30)
+
+    async def _fetch_all_required_events(self):
+        from rcn_core.time_event import TimeEvent
+
+        consumers = [
+            fn
+            for fn in TimeEvent()._dispatch_fns
+            if fn.event.get("require-storage") == "flows"
+        ]
+        if not consumers:
+            # Cleanup if no consumers
+            if len(self._cache) > self._max_cache_size:
+                self._cache = self._cache[-self._max_cache_size :]
+            return
+
+        # 1. Update last-id-timestamp for events that have 0
+        for fn in consumers:
+            c = fn.fn_name
+            ts = self.storage_md_get(c + "-last-id-timestamp")
+            if ts is None or float(ts) == 0:
+                self.storage_md_set(c + "-last-id-timestamp", self._server_start_ts)
+
+        # 2. Find min timestamp
+        timestamps = []
+        for fn in consumers:
+            ts = self.storage_md_get(fn.fn_name + "-last-id-timestamp")
+            timestamps.append(float(ts) if ts is not None else self._server_start_ts)
+
+        min_ts = min(timestamps) if timestamps else self._server_start_ts
+
+        # 3. Fetch from proxy if needed
+        # We fetch flows after the latest one we have in cache
+        fetch_ts = self._last_fetch_ts
+
+        async with self._fetch_lock:
+            url = "http://localhost:8082/GetFlowsAfterTimestmp"
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        url,
+                        params={
+                            "timestamp": fetch_ts,
+                            "count": 1000,
+                        },
+                    ) as resp:
+                        if resp.status == 200:
+                            flows = await resp.json()
+                            if flows:
+                                self.add_many(flows)
+            except Exception as e:
+                rlog(f"Error fetching remote flows: {e}", level="error")
+
+        # 4. Cleanup cache: keep only flows with T > min_ts (or at least server start)
+        self._cache = [
+            f
+            for f in self._cache
+            if float(f.get("timestamp", 0)) >= min(min_ts, self._server_start_ts)
+        ]
 
 
 def web_match_storage(match_str, target=None):
