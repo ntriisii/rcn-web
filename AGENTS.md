@@ -64,6 +64,9 @@ mitmproxy -s server.py
 
 # Run MCP server
 python mcp_server.py
+
+# Run tests using the local virtual environment
+./.venv/bin/pytest
 ```
 
 ## NOTES

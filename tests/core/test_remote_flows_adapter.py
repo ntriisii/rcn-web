@@ -91,19 +91,25 @@ async def test_fetch_all_required_events_initializes_consumers():
         patch("rcn_core.time_event.TimeEvent") as mock_te,
         patch("rcn_web.core.utils.StorageMetaData.storage_md_get") as mock_get,
         patch("rcn_web.core.utils.StorageMetaData.storage_md_set") as mock_set,
-        patch("aiohttp.ClientSession.get") as mock_http_get,
     ):
-        mock_te.return_value._dispatch_fns = [mock_consumer]
-        mock_get.side_effect = lambda key: 0 if "test_event" in key else None
-
         mock_resp = MagicMock()
         mock_resp.status = 200
         mock_resp.json = AsyncMock(return_value=[])
-        mock_http_get.return_value.__aenter__.return_value = mock_resp
 
-        await adapter._fetch_all_required_events()
+        mock_session = MagicMock()
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
 
-        mock_set.assert_any_call("test_event-last-id-timestamp", 500.0)
+        with patch("aiohttp.ClientSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+
+            mock_te.return_value._dispatch_fns = [mock_consumer]
+            mock_get.side_effect = lambda key: 0 if "test_event" in key else None
+
+            await adapter._fetch_all_required_events()
+
+            mock_set.assert_any_call("test_event-last-id-timestamp", 500.0)
 
 
 @pytest.mark.asyncio
@@ -119,21 +125,29 @@ async def test_cache_cleanup_logic():
     with (
         patch("rcn_core.time_event.TimeEvent") as mock_te,
         patch("rcn_web.core.utils.StorageMetaData.storage_md_get") as mock_get,
-        patch("aiohttp.ClientSession.get") as mock_http_get,
     ):
-        mock_te.return_value._dispatch_fns = [mock_fn1, mock_fn2]
-
-        event1_ts = 300.0
-        event2_ts = 350.0
-        mock_get.side_effect = lambda key: event1_ts if "event1" in key else event2_ts
-
         mock_resp = MagicMock()
         mock_resp.status = 200
         mock_resp.json = AsyncMock(return_value=[])
-        mock_http_get.return_value.__aenter__.return_value = mock_resp
 
-        await adapter._fetch_all_required_events()
+        mock_session = MagicMock()
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
 
-        # Pruning point is min(min(event_ts), start_ts) = min(300, 400) = 300
-        assert len(adapter._cache) == 1
-        assert adapter._cache[0]["timestamp"] == 350
+        with patch("aiohttp.ClientSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+
+            mock_te.return_value._dispatch_fns = [mock_fn1, mock_fn2]
+
+            event1_ts = 300.0
+            event2_ts = 350.0
+            mock_get.side_effect = (
+                lambda key: event1_ts if "event1" in key else event2_ts
+            )
+
+            await adapter._fetch_all_required_events()
+
+            # Pruning point is min(min(event_ts), start_ts) = min(300, 400) = 300
+            assert len(adapter._cache) == 1
+            assert adapter._cache[0]["timestamp"] == 350
