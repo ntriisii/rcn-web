@@ -70,6 +70,7 @@ python mcp_server.py
 ```
 
 ## NOTES
+- **Virtual Environment**: ALWAYS use the local `./.venv/bin/python` or `./.venv/bin/pytest`. Global environment is missing critical dependencies.
 - **Dependency**: Depends on `rcn-core` and `pentest-utils` (local editable packages).
 - **Storage**: Uses hierarchical SQLite storage. `web-apps` is the parent for most scanning data.
 - **Org-Mode**: Deeply integrated with Emacs/Org-mode for request generation and viewing.
