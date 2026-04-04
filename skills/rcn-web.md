@@ -22,8 +22,7 @@ The system organizes data into **Targets**, **Web Applications**, and **Storages
 
 ### Storage Hierarchy
 
-Storages use `::` as a hierarchical separator. Always use `rcn-web-interact describe-target` once you start any work to discover available storages and their schemas dynamically.
-
+Storages use `::` as a hierarchical separator. Always use `rcn-web-interact <target_name> describe-target` once you start any work to discover available storages and their schemas dynamically.
 
 
 ### Flow Data Structure
@@ -44,12 +43,11 @@ The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions.
 
 ### Arguments
 
-- `TARGET`: Target name. This is a mandatory positional argument used to route requests to the target-specific service (e.g., http://localhost:8023/<target_name>).
+- `TARGET`: Target name. This is a mandatory positional argument used to route requests to the target-specific service.
 
 ### Global Options
 
 All commands support the following global options:
-- `--base-url`: RCN server URL (default: http://localhost:8023)
 
 ### Command Reference
 
