@@ -71,7 +71,7 @@ Events are defined in automation YAML files. **IMPORTANT**: For an automation fi
 time-events:
   - function: py_my_handler     # Prefix function name with py_
     enabled: true               # Enable/disable the task
-    every: 10s                  # Scheduling frequency (e.g., 30s, 1h, 1d)
+    every: 1s                  # Scheduling frequency (e.g., 1s, 30m, 1h, 1d)
     single-run: false           # If true, the event runs once then disables
     require-storage: "entities" # The storage type to process
     min-entries: 1              # Minimum unprocessed entries to trigger
@@ -242,7 +242,7 @@ This example shows a three-stage pipeline: **Discovery** -> **AI Annotation** ->
 **YAML Config**:
 ```yaml
 - function: py_discover_new_items
-  every: 1h
+  every: 30m
   name: "initial-discovery"
 ```
 
@@ -294,7 +294,7 @@ async def analyze_items(event, *args):
 **YAML Config**:
 ```yaml
 - function: py_validate_annotations
-  every: 30s
+  every: 1h
   require-storage: "raw-items::annotations"
   name: "validator"
 ```
