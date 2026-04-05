@@ -396,6 +396,15 @@ class RemoteFlowsAdapter(StorageMetaData):
             self._server_start_ts = float(self._server_start_ts)
 
         self._last_fetch_ts = self._server_start_ts
+        from rcn_core.time_event import TimeEvent
+
+        TimeEvent().add_fn(
+            event={"name": "fetch_remote_flows", "every": "10s"},
+            fn=fetch_remote_flows,
+            interval=10,
+            repeat=True,
+            internal=True,
+        )
 
     @property
     def parent_container(self):
@@ -432,7 +441,7 @@ class RemoteFlowsAdapter(StorageMetaData):
         return data
 
     async def _fetch_and_update_cache(self, requester, count=100, category=None):
-        await self._fetch_all_required_events()
+        pass
 
     @asynccontextmanager
     async def get_unprocessed_entries(self, requester, count, category=None):
@@ -503,9 +512,6 @@ class RemoteFlowsAdapter(StorageMetaData):
             self._last_fetch_ts = float(self._cache[-1].get("timestamp", 0))
 
         return new_entries
-
-    async def _fetch_all_required_events(self):
-        await fetch_remote_flows(None, None)
 
 
 @rcn_event()
