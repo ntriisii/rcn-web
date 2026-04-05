@@ -433,11 +433,6 @@ class RemoteFlowsAdapter(StorageMetaData):
         actual_requester = f"{requester}:{category}" if category else requester
         last_ts = self.storage_md_get(actual_requester + "-last-id-timestamp") or 0.0
         data = [f for f in self._cache if float(f.get("timestamp", 0)) > float(last_ts)]
-        if data:
-            rlog(
-                f"RemoteFlowsAdapter for {actual_requester}: last_ts={last_ts}, found {len(data)} new items",
-                level="debug",
-            )
         self.storage_md_set(actual_requester + "-last-id-index", 0)
         return data
 
@@ -513,10 +508,6 @@ class RemoteFlowsAdapter(StorageMetaData):
 
         if new_entries:
             self._cache.extend(new_entries)
-            rlog(
-                f"RemoteFlowsAdapter cached {len(new_entries)} new entries. Cache size: {len(self._cache)}",
-                level="info",
-            )
             asyncio.create_task(process_new_entries_for_events(self, new_entries))
 
         return new_entries
@@ -533,7 +524,6 @@ async def fetch_remote_flows(event, scheduled_md):
         if fn.event and fn.event.get("require-storage") == "flows"
     ]
     if not consumers:
-        rlog("fetch_remote_flows: no consumers found", level="debug")
         # Cleanup if no consumers
         if len(adapter._cache) > adapter._max_cache_size:
             adapter._cache = adapter._cache[-adapter._max_cache_size :]
@@ -575,26 +565,15 @@ async def fetch_remote_flows(event, scheduled_md):
                         flows = await resp.json()
                         if flows:
                             adapter.add_many(flows)
-                        else:
-                            rlog(
-                                f"fetch_remote_flows: no new flows from proxy after {fetch_ts}",
-                                level="debug",
-                            )
         except Exception as e:
             rlog(f"Error fetching remote flows: {e}", level="error")
 
     # 4. Cleanup cache: keep only flows with T > min_ts (or at least server start)
-    prev_cache_size = len(adapter._cache)
     adapter._cache = [
         f
         for f in adapter._cache
         if float(f.get("timestamp", 0)) > min(min_ts, adapter._server_start_ts)
     ]
-    if len(adapter._cache) < prev_cache_size:
-        rlog(
-            f"fetch_remote_flows: pruned {prev_cache_size - len(adapter._cache)} entries from cache. New size: {len(adapter._cache)}",
-            level="debug",
-        )
 
 
 def web_match_storage(match_str, target=None):

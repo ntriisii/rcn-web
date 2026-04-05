@@ -104,7 +104,7 @@ def flow_in_scope(flow):
     if scope is None:
         return False
     inscope = check_domain_in_scope(domain, scope)
-    return inscope or in_scope_header
+    return bool(inscope or in_scope_header)
 
 
 def check_domain_in_scope(domain: str, scope: dict):
