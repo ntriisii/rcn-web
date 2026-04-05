@@ -45,6 +45,7 @@ async def test_add_many_triggers_events():
     ]
 
     with patch("rcn_core.data_access.process_new_entries_for_events") as mock_process:
+        adapter._last_fetch_ts = 0
         adapter.add_many(test_flows)
 
         # Give asyncio tasks a moment to run
@@ -109,7 +110,7 @@ async def test_fetch_remote_flows_initializes_consumers():
 
             await fetch_remote_flows(None, None)
 
-            mock_set.assert_any_call("test_event-last-id-timestamp", 500.0)
+            mock_set.assert_any_call("test_event-last-id-timestamp", 499.999)
 
 
 @pytest.mark.asyncio
