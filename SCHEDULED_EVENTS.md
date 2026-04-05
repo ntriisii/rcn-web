@@ -100,9 +100,141 @@ my-automation-group:
       every: 1h  # Overrides the group default
 ```
 
+### D. Operational Synchronization (Semaphores)
+Handlers use **Storage Metadata Flags** to coordinate execution state across multiple events. This prevents redundant processing and handles "lock" states between independent tasks. Common flags include `[task]-running`, `[task]-finished`, and `[task]-last-check-time`.
+
 ---
 
-## 4. Full Pipeline Case Study: Discovery to Validation
+## 4. Operational Coordination: Semaphores & Error Recovery
+
+To ensure robust execution, handlers often implement a "Locking" pattern using storage-level metadata. This is critical for tasks that are expensive or must not overlap.
+
+### The Locking Pattern
+By checking for a "running" flag before starting and clearing it on completion (or failure), handlers can ensure they only run once across the entire project structure.
+
+```python
+@rcn_event()
+async def coordinated_task(event, *args):
+    async with get_unprocessed_entries(event["name"], event) as items:
+        for item in items.values():
+            entry = item["entry"]
+            parent = item["parent"]
+            
+            # 1. Check for Semaphores (Locks)
+            if parent.storage_md_get("my-task-finished"): continue
+            if parent.storage_md_get("my-task-running"): continue
+            
+            # 2. Set the Lock
+            parent.storage_md_set("my-task-running", True)
+            parent.storage_md_set("my-task-started", datetime.now().timestamp())
+            
+            try:
+                # 3. Perform Logic...
+                await perform_heavy_logic(entry)
+                
+                # 4. Record Success
+                parent.storage_md_set("my-task-finished", True)
+            except Exception as e:
+                # 5. Handle Failures & Reset Locks
+                # This ensures the task can be retried on next execution
+                raise e
+            finally:
+                # Always clear the lock
+                parent.storage_md_set("my-task-running", False)
+```
+
+### F. Cross-Storage Context (Enrichment)
+Handlers can retrieve data from **multiple storages** simultaneously. While processing a primary entry, a handler can query unrelated storages (e.g., matching IPs against Domains) to create a richer context for its analysis.
+
+---
+
+## 5. Advanced Implementation: Cross-Referencing & Enrichment
+
+Complex handlers often need to look outside their primary storage to make informed decisions. This is done by directly retrieving other storages via `get_storage().get_storage_create("storage-name")`.
+
+### Pattern: The Contextual Enricher
+This pattern is used to combine data from different discovery sources to provide a unified finding.
+
+```python
+from rcn_core.data_access import get_storage
+
+@rcn_event()
+async def enrichment_handler(event, *args):
+    # Primary storage we are processing
+    scanner_name = event.get("name")
+    
+    # 1. Access a secondary storage for cross-referencing
+    # e.g., We are processing 'Findings' but want to check against 'Inventory'
+    inventory_st = get_storage().get_storage_create("inventory")
+    inventory_data = {i["id"]: i for i in inventory_st.get()}
+    
+    async with get_unprocessed_entries(scanner_name, event) as items:
+        for item in items.values():
+            entry = item["entry"]
+            
+            # 2. Perform cross-storage lookup
+            related_info = inventory_data.get(entry.get("related_id"))
+            
+            if related_info:
+                # 3. Enrich the finding with data from the secondary storage
+                add_annotation(
+                    entry_id=entry["id"],
+                    storage_name=item["storage"].storage_name,
+                    key="enriched-context",
+                    value=related_info["metadata"],
+                    parent_id=item["parent"]["id"]
+                )
+```
+
+### G. Flow Delegation (Modular Execution)
+Heavy or complex logic is often abstracted into **Flows** (via `RCN_FLOWS`). An event handler acts as a thin orchestrator that retrieves data, instantiates a specific flow, and awaits its completion. This ensures modularity and easy testing of complex logic.
+
+---
+
+## 6. Advanced Implementation: Flow Delegation
+
+For tasks involving complex, multi-stage logic, handlers delegate work to specialized **Flow** objects. This pattern is essential for logic that requires its own state management or external resource handling.
+
+### Pattern: The Flow Orchestrator
+This pattern allows the event system to trigger complex, predefined workflows stored in the `RCN_FLOWS` registry.
+
+```python
+from rcn_core.globals import RCN_FLOWS
+
+@rcn_event()
+async def flow_orchestrator_handler(event, *args):
+    # 1. Identify the flow to run (can be defined in YAML)
+    flow_name = event.get("flow", "default-flow")
+    flow_fn = RCN_FLOWS.get(flow_name)
+    
+    if not flow_fn:
+        return
+    
+    async with get_unprocessed_entries(event["name"], event) as items:
+        for item in items.values():
+            entry = item["entry"]
+            
+            # 2. Instantiate the Flow
+            flow = flow_fn()
+            
+            # 3. Pass data from the entry and event config
+            flow.set_data(entry)
+            flow.set_config(event)
+            
+            try:
+                # 4. Run the Flow asynchronously
+                result = await flow.run()
+                
+                # 5. Handle output...
+                process_flow_results(result)
+            except Exception as e:
+                # 6. Errors are raised back to the scheduler
+                raise e
+```
+
+---
+
+## 7. Full Pipeline Case Study: Discovery to Validation
 
 This example shows a three-stage pipeline: **Discovery** -> **AI Annotation** -> **Functional Validation**.
 
