@@ -1,6 +1,6 @@
 # Scheduled Events & Background Orchestration
 
-Scheduled events are asynchronous Python functions triggered periodically based on configuration. They are the primary mechanism for automated background processing and data analysis.
+Scheduled events are asynchronous Python functions triggered periodically based on configuration. They are the primary mechanism for automated background processing, discovery, and data analysis pipelines.
 
 ---
 
@@ -10,7 +10,7 @@ Scheduled events are asynchronous Python functions triggered periodically based 
 All event handlers must be registered using the `@rcn_event()` decorator to be discoverable by the orchestration engine.
 
 ### Function Signature
-Every event handler **MUST** be an `async` function. The first argument is always the `event` configuration dictionary.
+Every event handler **MUST** be an `async` function. The first argument is the `event` configuration dictionary. While a second `scheduled_md` argument exists in the system, it is managed internally and should not be used for logic implementation.
 
 ```python
 from rcn_core.decorators import rcn_event
@@ -23,46 +23,48 @@ async def my_scheduled_handler(event, *args):
 
 ---
 
-## 2. Data Processing Patterns
+## 2. Advanced Data Processing Patterns
 
-Scheduled events generally follow one of several core architectural patterns:
+### A. Processing Unprocessed Entries
+This is the standard pattern for data discovery and enrichment. It ensures that each entry in a storage is handled exactly once by a specific task.
 
-### A. The Unprocessed Entry Loop
-This is the most common pattern for data enrichment. The event handler iterates over new data that has not yet been processed by this specific task.
+When `require-storage` is specified in YAML, the scheduler identifies all matching storages. The `get_unprocessed_entries` context manager then provides a dictionary of items that haven't been "seen" by the task's unique `name`.
 
-When `require-storage` is specified in YAML, the scheduler identifies all matching storages. The `get_unprocessed_entries` context manager then provides a dictionary of items that haven't been tagged by the event's unique `name`.
-
-### B. The Discovery Pipeline (Producer-Consumer)
-One event acts as a **Producer**, gathering data and creating new entries in a storage. A subsequent event acts as a **Consumer**, picking up those new entries for specialized analysis.
-
-### C. Initializer Tasks (`single-run`)
-Tasks that perform one-time setup or bootstrap logic for a new entity. These use the `single-run: true` flag in YAML to ensure they only fire once.
-
-### D. Batch Processing
-By using `max-entries` and `min-entries`, events can perform "trickle processing"—handling small, manageable chunks of data over time to prevent system resource exhaustion during massive data ingestions.
-
-### E. Annotations & Data Tagging
-Instead of modifying raw data entries (which are passed as read-only dictionaries), analysis results should be stored as **Annotations**. Annotations are linked to an entry and allow for multi-stage processing.
-
-To add an annotation, use the global utility:
 ```python
-from rcn_core.storage.bases import add_annotation
-
-# Add a discovery finding or analysis result to an existing entry
-add_annotation(
-    entry_id=entry["id"],
-    storage_name=storage.storage_name,
-    key="analysis-tag",
-    value="result-data",
-    parent_id=parent_id
-)
+async with get_unprocessed_entries(scanner_name, event) as items:
+    for item in items.values():
+        entry = item["entry"]     # The raw data dictionary
+        storage = item["storage"] # The storage instance
+        parent = item["parent"]   # The parent entity dictionary
 ```
+
+### B. Processing Annotations (Metadata Processing)
+Annotations are metadata "tags" attached to entries. Processing annotations allows for creating complex analysis pipelines where one task's finding triggers another task's action.
+
+To process only new annotations with a specific key, use `get_unprocessed_annotations`:
+
+```python
+from rcn_core.data_access import get_unprocessed_annotations
+
+# Processes only new annotations where key == "analysis-needed"
+async with get_unprocessed_annotations("analysis-needed", scanner_name, event) as unscanned:
+    for item in unscanned.values():
+        annotation = item["entry"]           # The annotation dictionary
+        ref_storage = item["storage"]        # The storage the annotation is on
+        parent = item["parent"]              # The parent entity
+        
+        # Access the annotation value
+        task_description = annotation["value"]
+```
+
+### C. The Discovery Pipeline (Producer-Consumer)
+A "Producer" event gathers data and creates new entries. A "Consumer" event (using `require-storage`) picks up those new entries. This creates a reactive chain of automation.
 
 ---
 
 ## 3. Configuration (YAML)
 
-Events are defined in automation YAML files. **IMPORTANT**: For an automation file to be active, it must be included in the `includes` section of the master configuration (e.g., `server-config.yaml`).
+Events are defined in automation YAML files. **IMPORTANT**: For an automation file to be active, it must be explicitly included in the `includes` section of the master configuration (e.g., `server-config.yaml`).
 
 ### YAML Schema & Parameters
 ```yaml
@@ -74,94 +76,116 @@ time-events:
     require-storage: "entities" # The storage type to process
     min-entries: 1              # Minimum unprocessed entries to trigger
     max-entries: 100            # Maximum entries to process per run
-    name: "my-task"             # Unique identifier for state tracking
-    custom_param: "value"       # Custom parameters passed in the 'event' dict
+    name: "my-task-id"          # Unique identifier for state tracking
+    config_option: "value"      # Custom parameters passed in the 'event' dict
 ```
 
 *   **`every`**: Execution frequency. Supports time suffixes like `s`, `m`, `h`, `d`.
-*   **`require-storage`**: Tells the scheduler which storage to collect data from. The handler will receive these as unprocessed entries.
-*   **`min-entries` / `max-entries`**: Control the volume of data processed in a single run.
-*   **`name`**: Critical for `get_unprocessed_entries`. It acts as the "fingerprint" of the scanner to track which entries have already been seen.
+*   **`require-storage`**: Specifies which storage to collect data from.
+*   **`name`**: Critical for tracking progress. It acts as the "fingerprint" that prevents re-processing the same data.
 
 ### Configuration Overlays
-You can provide default configurations for a group of events using a `config:` block. This is useful for passing shared parameters like API keys or base prompts.
+You can provide default configurations for a group of events using a `config:` block.
 
 ```yaml
 my-automation-group:
   config:
-    every: 300
-    custom_flag: true
+    every: 5m
+    max-entries: 50
   events:
     - function: py_handler_one
+      name: "task-1"
     - function: py_handler_two
+      name: "task-2"
+      every: 1h  # Overrides the group default
 ```
 
 ---
 
-## 4. Implementation Variations
+## 4. Full Pipeline Case Study: Discovery to Validation
 
-### Variation 1: Basic Enrichment (Consumer)
-Processes raw data and adds a simple tag.
+This example shows a three-stage pipeline: **Discovery** -> **AI Annotation** -> **Functional Validation**.
 
-```python
-from rcn_core.decorators import rcn_event
-from rcn_core.data_access import get_unprocessed_entries
-from rcn_core.storage.bases import add_annotation
-
-@rcn_event()
-async def tag_new_entries(event, *args):
-    scanner_name = event.get("name")
-    
-    # Iterate over { id: {"entry": dict, "storage": storage_obj, "parent": parent_obj} }
-    async with get_unprocessed_entries(scanner_name, event) as items:
-        for item in items.values():
-            entry = item["entry"]
-            storage = item["storage"]
-            parent = item["parent"]
-
-            # Perform logic...
-            add_annotation(
-                entry_id=entry["id"],
-                storage_name=storage.storage_name,
-                key="my-tag",
-                value="processed",
-                parent_id=parent["id"]
-            )
+### Stage 1: Discovery (The Producer)
+**YAML Config**:
+```yaml
+- function: py_discover_new_items
+  every: 1h
+  name: "initial-discovery"
 ```
 
-### Variation 2: Data Discovery (Producer)
-Reads entries from one storage and creates new ones in another.
-
+**Python Handler**:
 ```python
 from rcn_core.storage.bases import get_storage_create
 
 @rcn_event()
-async def discover_new_entities(event, *args):
-    scanner_name = event.get("name")
+async def discover_new_items(event, *args):
+    # Gathering data from an external source...
+    new_data = [{"name": "item_1"}, {"name": "item_2"}]
     
-    async with get_unprocessed_entries(scanner_name, event) as items:
-        for item in items.values():
-            entry = item["entry"]
-            parent = item["parent"]
-            
-            # Find something new...
-            findings = extract_logic(entry)
-            
-            # Add new data to a dedicated discovery storage
-            sub_storage = get_storage_create("discoveries", parent_id=parent["id"])
-            sub_storage.add_many([{"data": f} for f in findings])
+    # Store in a dedicated storage
+    # This will trigger any events requiring "raw-items"
+    st = get_storage_create("raw-items")
+    st.add_many(new_data)
 ```
 
-### Variation 3: Initializer (Bootstrapping)
-Sets up initial state when a new parent entity is created.
+### Stage 2: AI Annotation (The Analyzer)
+**YAML Config**:
+```yaml
+- function: py_analyze_items
+  every: 10s
+  require-storage: "raw-items"
+  name: "ai-analyzer"
+```
 
+**Python Handler**:
 ```python
+from rcn_core.storage.bases import add_annotation
+
 @rcn_event()
-async def handle_bootstrapping(event, *args):
-    # This task likely uses 'single-run: true' in YAML
+async def analyze_items(event, *args):
     async with get_unprocessed_entries(event["name"], event) as items:
         for item in items.values():
-            entity = item["entry"]
-            # Perform expensive one-time setup
-            await setup_entity_logic(entity)
+            entry = item["entry"]
+            
+            # Tag the item for deep-dive validation
+            add_annotation(
+                entry_id=entry["id"],
+                storage_name=item["storage"].storage_name,
+                key="needs-validation",
+                value="Check integrity of " + entry["name"],
+                parent_id=item["parent"]["id"]
+            )
+```
+
+### Stage 3: Functional Validation (The Annotation Consumer)
+**YAML Config**:
+```yaml
+- function: py_validate_annotations
+  every: 30s
+  require-storage: "raw-items::annotations"
+  name: "validator"
+```
+
+**Python Handler**:
+```python
+@rcn_event()
+async def validate_annotations(event, *args):
+    # Process only annotations with key="needs-validation"
+    async with get_unprocessed_annotations("needs-validation", event["name"], event) as items:
+        for item in items.values():
+            annotation = item["entry"]
+            parent_id = item["parent"]["id"]
+            
+            # Perform actual validation...
+            success = await run_validation(annotation["value"])
+            
+            # Record final verdict as a NEW annotation on the original entry
+            add_annotation(
+                entry_id=annotation["entry_id"], # Link back to original entry
+                storage_name=item["storage"].storage_name,
+                key="validation-verdict",
+                value="Success" if success else "Failed",
+                parent_id=parent_id
+            )
 ```
