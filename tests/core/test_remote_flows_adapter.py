@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import time
 from unittest.mock import MagicMock, AsyncMock, patch
-from rcn_web.core.utils import RemoteFlowsAdapter
+from rcn_web.core.utils import RemoteFlowsAdapter, fetch_remote_flows
 
 
 @pytest.fixture(autouse=True)
@@ -78,7 +78,7 @@ async def test_add_many_deduplication():
 
 
 @pytest.mark.asyncio
-async def test_fetch_all_required_events_initializes_consumers():
+async def test_fetch_remote_flows_initializes_consumers():
     """Verify consumers with 0 timestamp are initialized to server start."""
     adapter = RemoteFlowsAdapter.get_instance()
     adapter._server_start_ts = 500.0
@@ -107,7 +107,7 @@ async def test_fetch_all_required_events_initializes_consumers():
             mock_te.return_value._dispatch_fns = [mock_consumer]
             mock_get.side_effect = lambda key: 0 if "test_event" in key else None
 
-            await adapter._fetch_all_required_events()
+            await fetch_remote_flows(None, None)
 
             mock_set.assert_any_call("test_event-last-id-timestamp", 500.0)
 
@@ -146,8 +146,40 @@ async def test_cache_cleanup_logic():
                 lambda key: event1_ts if "event1" in key else event2_ts
             )
 
-            await adapter._fetch_all_required_events()
+            await fetch_remote_flows(None, None)
 
             # Pruning point is min(min(event_ts), start_ts) = min(300, 400) = 300
             assert len(adapter._cache) == 1
             assert adapter._cache[0]["timestamp"] == 350
+
+
+@pytest.mark.asyncio
+async def test_fetch_remote_flows_handles_none_event():
+    """Verify fetch_remote_flows handles consumers with None event attribute."""
+    adapter = RemoteFlowsAdapter.get_instance()
+
+    mock_none_event_fn = MagicMock()
+    mock_none_event_fn.event = None
+
+    mock_valid_fn = MagicMock(fn_name="valid", event={"require-storage": "flows"})
+
+    with (
+        patch("rcn_core.time_event.TimeEvent") as mock_te,
+        patch("rcn_web.core.utils.StorageMetaData.storage_md_get", return_value=100.0),
+        patch("rcn_web.core.utils.StorageMetaData.storage_md_set"),
+    ):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value=[])
+        mock_session = MagicMock()
+        mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_resp)
+
+        with patch("aiohttp.ClientSession") as mock_session_cls:
+            mock_session_cls.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+
+            mock_te.return_value._dispatch_fns = [mock_none_event_fn, mock_valid_fn]
+
+            # This should not raise AttributeError: 'NoneType' object has no attribute 'get'
+            await fetch_remote_flows(None, None)

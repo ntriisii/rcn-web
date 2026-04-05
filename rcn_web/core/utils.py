@@ -510,6 +510,7 @@ class RemoteFlowsAdapter(StorageMetaData):
         if new_entries:
             self._cache.extend(new_entries)
             self._last_fetch_ts = float(self._cache[-1].get("timestamp", 0))
+            asyncio.create_task(process_new_entries_for_events(self, new_entries))
 
         return new_entries
 
@@ -522,7 +523,7 @@ async def fetch_remote_flows(event, scheduled_md):
     consumers = [
         fn
         for fn in TimeEvent()._dispatch_fns
-        if fn.event.get("require-storage") == "flows"
+        if fn.event and fn.event.get("require-storage") == "flows"
     ]
     if not consumers:
         # Cleanup if no consumers
