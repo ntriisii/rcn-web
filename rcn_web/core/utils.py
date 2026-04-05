@@ -396,15 +396,6 @@ class RemoteFlowsAdapter(StorageMetaData):
             self._server_start_ts = float(self._server_start_ts)
 
         self._last_fetch_ts = self._server_start_ts
-        from rcn_core.time_event import TimeEvent
-
-        TimeEvent().add_fn(
-            event={"name": "fetch_remote_flows", "every": "10s"},
-            fn=fetch_remote_flows,
-            interval=10,
-            repeat=True,
-            internal=True,
-        )
 
     @property
     def parent_container(self):
