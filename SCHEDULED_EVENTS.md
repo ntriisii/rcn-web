@@ -42,6 +42,9 @@ Handlers often follow a "Read-Analyze-Tag" pattern. They read raw data, perform 
 ### D. Hierarchical Orchestration
 Events can be chained. One event's output (e.g., creating a new entry in a sub-storage) often acts as the trigger for the next event in the pipeline.
 
+### E. Data-Storage Mapping
+The system supports a powerful mapping mechanism where an event can request a specific type of storage (e.g., `entities::annotations`) and the orchestration engine will automatically identify all matching storage instances across different parent entities. This allows a single event handler to process data across the entire project structure without knowing the specific hierarchy in advance.
+
 ---
 
 ## 3. Configuration (YAML)
@@ -57,12 +60,19 @@ time-events:
     enabled: true                      # Activation toggle
     interval: 60                       # Run every 60 seconds
     single-run: false                  # Set to true for one-time initialization
+    require-storage: "entities"        # Wait for data in this storage
     custom_param: "value"              # Passed into the 'event' dict
 ```
 
 *   **`function`**: The name of the Python function. By convention, it is prefixed with `py_` in YAML, which the loader strips to find the decorated function.
 *   **`interval`**: The frequency of execution in seconds.
 *   **`single-run`**: If true, the event runs once and is then disabled.
+*   **`require-storage`**: A core orchestration parameter. If set, the scheduler will only fire the event if the specified storage has entries. The orchestration engine uses a mapping function (e.g., `web_match_storage`) to find matching storages across all parent entities.
+
+### Execution Models: Push vs. Pull
+The RCN platform supports two ways of triggering scheduled events:
+1.  **Pull (Polling)**: The scheduler checks every `interval` seconds if conditions are met and fires the event.
+2.  **Push (Reactive)**: When new data is added to a storage via system-wide utilities (e.g., `add_many`), the system automatically schedules the relevant consumer events to run immediately, ensuring minimal latency between data discovery and processing.
 
 ### Configuration Aggregation (`includes`)
 The system uses a recursive include mechanism to manage complex configurations. A master file (e.g., `server-config.yaml`) can aggregate settings from multiple sources:
