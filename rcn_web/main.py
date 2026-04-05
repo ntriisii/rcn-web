@@ -64,8 +64,8 @@ import rcn_web.viewers.emacs.ip
 import rcn_web.viewers.emacs.dorks
 # from pentest_utils.web.rcn_helpers import get_proxy_data # commonly used in yaml
 
-# # Configure TimeEvent to use web storage matcher
-# TimeEvent().set_match_storage_fn(web_match_storage)
+# Configure TimeEvent to use web storage matcher
+TimeEvent().set_match_storage_fn(web_match_storage)
 
 # target_storage = TargetStorage.get_target_storage()
 dlls = ctypes.CDLL("libc.so.6")
