@@ -10,6 +10,9 @@ from rcn_web.core.utils import get_storage, web_match_storage
 def _resolve_storage(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
+    # Normalize parent_id (0 is often a placeholder)
+    pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
+
     # 1. Specialized flows handling
     if storage_name == "flows":
         from rcn_web.core.utils import RemoteFlowsAdapter
@@ -19,24 +22,21 @@ def _resolve_storage(
     # 2. Try project-specific matcher (handles 'web-apps', 'web-apps::*', etc.)
     matches = web_match_storage(storage_name)
     if matches:
-        # If parent_id is provided, try to find the specific app context among matches
-        if parent_id is not None:
+        if pid is not None:
             for m in matches:
                 st = m["storage"]
-                # Match by parent_id attribute (integer or string)
-                if hasattr(st, "parent_id") and str(st.parent_id) == str(parent_id):
+                if hasattr(st, "parent_id") and str(st.parent_id) == str(pid):
                     return st
 
-        # If no parent_id or no match found, but we have matches, return the first one
-        # This ensures 'web-apps' at the top level always returns the main collection
+        # If no pid or no specific match, return the first one (top-level collection)
         return matches[0]["storage"]
 
     # 3. For sub-storages with a parent_id, resolve directly if matcher failed
-    if "::" in storage_name and parent_id:
+    if "::" in storage_name and pid:
         try:
             from rcn_core.storage.bases import get_storage_create as gsc
 
-            return gsc(storage_name, parent_id=int(parent_id))
+            return gsc(storage_name, parent_id=int(pid))
         except (ValueError, TypeError, Exception):
             pass
 
@@ -44,8 +44,7 @@ def _resolve_storage(
     target_storage = get_storage()
     if target_storage:
         try:
-            # MultiTargetStorage.get_storage_create handles default target logic
-            return target_storage.get_storage_create(storage_name, parent_id=parent_id)
+            return target_storage.get_storage_create(storage_name, parent_id=pid)
         except Exception:
             pass
 
