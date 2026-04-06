@@ -18,9 +18,10 @@ from mitmproxy.http import HTTPFlow
 
 # This is our port mapping. In a real app, this might come
 # from a config file, environment variables, or a service discovery tool.
-CURRENT_PORT = 8030
+CURRENT_PORT = 8031
 TARGET_TO_PORT_MAPPING = {}
-RUNNING_PROCESSES = []
+# target_name -> subprocess object
+RUNNING_PROCESSES = {}
 
 # Mapping of target name -> set of active websocket flows
 TARGET_WS_CLIENTS = defaultdict(set)
@@ -48,13 +49,45 @@ async def request(flow: HTTPFlow):
     global CURRENT_PORT, TARGET_TO_PORT_MAPPING, RUNNING_PROCESSES
 
     print("receiving a request in here", flow.request.url)
+
+    # Endpoint to restart a target's downstream service
+    if flow.request.path.startswith("/restartTarget/"):
+        target_to_restart = flow.request.path.split("/")[-1]
+        if target_to_restart in RUNNING_PROCESSES:
+            print(f"Restarting target: {target_to_restart}")
+            proc = RUNNING_PROCESSES.pop(target_to_restart)
+            try:
+                proc.terminate()
+                await proc.wait()
+            except Exception as e:
+                print(f"Error terminating process for {target_to_restart}: {e}")
+
+            if target_to_restart in TARGET_TO_PORT_MAPPING:
+                del TARGET_TO_PORT_MAPPING[target_to_restart]
+
+            flow.response = http.Response.make(
+                200,
+                f'{{ "status": "restarted", "target": "{target_to_restart}" }}'.encode(
+                    "utf-8"
+                ),
+                {"Content-Type": "application/json"},
+            )
+        else:
+            flow.response = http.Response.make(
+                404,
+                f'{{ "error": "Target {target_to_restart} not running" }}'.encode(
+                    "utf-8"
+                ),
+                {"Content-Type": "application/json"},
+            )
+        return
+
     # scope should be all the running targets
     if flow.request.url == "http://localhost:8023/getScope":
         scope = {}
         # send the request to all the running services and parse that scope and send it
         async with httpx.AsyncClient() as client:
             for target in TARGET_TO_PORT_MAPPING:
-                print("getting the freaking scope for target", target)
                 port = TARGET_TO_PORT_MAPPING[target]
                 try:
                     resp = await client.get(f"http://localhost:{port}/getScope")
@@ -98,7 +131,12 @@ async def request(flow: HTTPFlow):
 
         print(f"Starting rcn_web for {target_name} on port {cport}...")
         proc = await asyncio.create_subprocess_exec(
-            python, "-m", "rcn_web", recon_dir_path, "--port", str(cport),
+            python,
+            "-m",
+            "rcn_web",
+            recon_dir_path,
+            "--port",
+            str(cport),
             env={**os.environ, "PYTHONPATH": python_path},
         )
 
@@ -124,7 +162,7 @@ async def request(flow: HTTPFlow):
             )
             return
 
-        RUNNING_PROCESSES.append(proc)
+        RUNNING_PROCESSES[target_name] = proc
         TARGET_TO_PORT_MAPPING[target_name] = cport
         CURRENT_PORT += 1
 
@@ -168,11 +206,11 @@ def done():
     """
     global RUNNING_PROCESSES
     print("Mitmproxy shutting down, killing child processes...")
-    for proc in RUNNING_PROCESSES:
+    for target_name, proc in list(RUNNING_PROCESSES.items()):
         try:
             proc.terminate()
         except Exception as e:
-            print(f"Error terminating process: {e}")
+            print(f"Error terminating process for {target_name}: {e}")
 
 
 async def websocket_message(flow: HTTPFlow):
