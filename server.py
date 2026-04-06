@@ -26,6 +26,9 @@ RUNNING_PROCESSES = {}
 # Mapping of target name -> set of active websocket flows
 TARGET_WS_CLIENTS = defaultdict(set)
 
+# Lock to prevent multiple processes for the same target from starting at once
+STARTUP_LOCK = asyncio.Lock()
+
 
 def expand_target(target_str):
     global TARGET_TO_PORT_MAPPING
@@ -111,60 +114,62 @@ async def request(flow: HTTPFlow):
     # Store the target name in metadata for websocket syncing
     flow.metadata["target_name"] = target_name
 
-    if target_name not in TARGET_TO_PORT_MAPPING:
-        # create the mapping
-        cport = CURRENT_PORT
-        recon_dir_path = os.path.expanduser(f"~/recon/{target_name}/")
+    async with STARTUP_LOCK:
+        if target_name not in TARGET_TO_PORT_MAPPING:
+            # create the mapping
+            cport = CURRENT_PORT
+            recon_dir_path = os.path.expanduser(f"~/recon/{target_name}/")
 
-        if not os.path.exists(recon_dir_path):
-            flow.response = http.Response.make(
-                404,  # Status code
-                b'{"error": "Invalid data index provided"}',  # Response body
-                {"Content-Type": "application/json"},  # Headers
+            if not os.path.exists(recon_dir_path):
+                flow.response = http.Response.make(
+                    404,  # Status code
+                    b'{"error": "Invalid data index provided"}',  # Response body
+                    {"Content-Type": "application/json"},  # Headers
+                )
+
+                return
+
+            python_root = os.path.expanduser("~/programming-projects/python/rcn-web/")
+            python = os.path.join(python_root, ".venv/bin/python3")
+
+            print(f"Starting rcn_web for {target_name} on port {cport}...")
+            proc = await asyncio.create_subprocess_exec(
+                python,
+                "-m",
+                "rcn_web",
+                recon_dir_path,
+                "--port",
+                str(cport),
+                env=os.environ,
             )
 
-            return
+            started = False
+            async with httpx.AsyncClient() as client:
+                for _ in range(20):  # Try for 10 seconds
+                    try:
+                        # Use a very short timeout for the health check
+                        resp = await client.get(
+                            f"http://localhost:{cport}", timeout=0.5
+                        )
+                        if resp.status_code < 500:  # Any response is usually enough
+                            started = True
+                            break
+                    except (httpx.ConnectError, httpx.TimeoutException):
+                        await asyncio.sleep(0.5)
+                        continue
 
-        python_root = os.path.expanduser("~/programming-projects/python/rcn-web/")
-        python_path = (os.getenv("PYTHONPATH") or "") + ":" + python_root
-        python = os.path.join(python_root, ".venv/bin/python3")
+            if not started:
+                print(f"Failed to start rcn_web for {target_name}")
+                flow.response = http.Response.make(
+                    500,
+                    b'{"error": "Failed to start downstream service"}',
+                    {"Content-Type": "application/json"},
+                )
+                return
 
-        print(f"Starting rcn_web for {target_name} on port {cport}...")
-        proc = await asyncio.create_subprocess_exec(
-            python,
-            "-m",
-            "rcn_web",
-            recon_dir_path,
-            "--port",
-            str(cport),
-            env={**os.environ, "PYTHONPATH": python_path},
-        )
-
-        started = False
-        async with httpx.AsyncClient() as client:
-            for _ in range(20):  # Try for 10 seconds
-                try:
-                    # Use a very short timeout for the health check
-                    resp = await client.get(f"http://localhost:{cport}", timeout=0.5)
-                    if resp.status_code < 500:  # Any response is usually enough
-                        started = True
-                        break
-                except (httpx.ConnectError, httpx.TimeoutException):
-                    await asyncio.sleep(0.5)
-                    continue
-
-        if not started:
-            print(f"Failed to start rcn_web for {target_name}")
-            flow.response = http.Response.make(
-                500,
-                b'{"error": "Failed to start downstream service"}',
-                {"Content-Type": "application/json"},
-            )
-            return
-
-        RUNNING_PROCESSES[target_name] = proc
-        TARGET_TO_PORT_MAPPING[target_name] = cport
-        CURRENT_PORT += 1
+            RUNNING_PROCESSES[target_name] = proc
+            TARGET_TO_PORT_MAPPING[target_name] = cport
+            CURRENT_PORT += 1
 
     flow.request.host = "localhost"
     flow.request.port = TARGET_TO_PORT_MAPPING[target_name]

@@ -1,5 +1,18 @@
 import sys
+import os
+import importlib
 import pprint
+
+# Ensure local rcn-core is used
+core_path = os.path.expanduser("~/programming-projects/python/rcn-core/")
+if core_path not in sys.path:
+    sys.path.insert(0, core_path)
+
+# Force reload of critical core modules if they were pre-loaded from site-packages
+for mod_name in ["rcn_core.data_access", "rcn_core.mcp.api", "rcn_core.storage.bases"]:
+    if mod_name in sys.modules:
+        importlib.reload(sys.modules[mod_name])
+
 import random
 import ctypes
 import datetime
@@ -85,6 +98,23 @@ app.include_router(storage_router)
 app.include_router(test_proxy)
 app.include_router(mcp_router)
 app.include_router(websockets_router)
+
+
+@app.get("/debug/paths")
+def debug_paths():
+    from rcn_web.core import utils
+    from rcn_web.routes import mcp_api
+    from rcn_web.core.utils import web_match_storage
+
+    match_result = web_match_storage("web-apps::app-flows")
+
+    return {
+        "utils_file": utils.__file__,
+        "mcp_api_file": mcp_api.__file__,
+        "match_found": len(match_result) > 0 if match_result else False,
+        "match_repr": str(match_result),
+        "sys_path": sys.path,
+    }
 
 
 @app.on_event("startup")
