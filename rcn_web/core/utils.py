@@ -587,8 +587,8 @@ def web_match_storage(match_str, target=None):
 
     current_storage = target if target else get_storage()
 
-    # Direct resolution fallback: if the name exists exactly in the schema cache, use it.
-    # This handles hierarchical names (e.g. web-apps::app-flows) without needing app scoping.
+    # Priority 1: Direct resolution for hierarchical names that exist as actual tables.
+    # This avoids over-expansion when a specific collection is requested.
     if (
         hasattr(current_storage, "schema_cache")
         and match_str in current_storage.schema_cache
@@ -598,26 +598,6 @@ def web_match_storage(match_str, target=None):
             return [{"storage": st, "parent": current_storage}]
         except:
             pass
-
-    # Definitive fallback: check database directly if cache missed
-    try:
-        import rcn_core.globals
-        import sqlite3
-
-        tdir = getattr(rcn_core.globals, "TARGET_DIR", None)
-        if tdir:
-            db_path = os.path.join(tdir, "rcn_automation_data.db")
-            if os.path.exists(db_path):
-                with sqlite3.connect(db_path) as conn:
-                    cursor = conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                        (match_str,),
-                    )
-                    if cursor.fetchone():
-                        st = current_storage.get_storage_create(match_str)
-                        return [{"storage": st, "parent": current_storage}]
-    except:
-        pass
 
     if hasattr(current_storage, "targets") and target is None:
         found_storages = []
@@ -637,48 +617,6 @@ def web_match_storage(match_str, target=None):
     sub_storage_name = "::".join(parts[1:])
 
     if container in ["web-apps", "all-web-apps", "apps"]:
-        # 1. Direct resolution fallback: if the name is a full hierarchical path,
-        # try to resolve it directly from the current storage context first.
-        if sub_storage_name:
-            # Check global schema cache
-            if (
-                hasattr(current_storage, "schema_cache")
-                and match_str in current_storage.schema_cache
-            ):
-                try:
-                    st = current_storage.get_storage_create(match_str)
-                    return [{"storage": st, "parent": current_storage}]
-                except:
-                    pass
-
-            # Check if it exists with an 'apps::' prefix variation (some tables use different naming)
-            match_variants = [
-                match_str,
-                match_str.replace("web-apps::", "apps::"),
-                match_str.replace("web-apps::", ""),
-            ]
-            if hasattr(current_storage, "schema_cache"):
-                for variant in match_variants:
-                    if variant in current_storage.schema_cache:
-                        try:
-                            st = current_storage.get_storage_create(variant)
-                            return [{"storage": st, "parent": current_storage}]
-                        except:
-                            pass
-
-            # Deep search across all targets
-            if hasattr(current_storage, "targets"):
-                for tname, t in current_storage.targets.items():
-                    if tname == "__multi_target__":
-                        continue
-                    try:
-                        st = t.get_storage_create(match_str)
-                        # Check target's local state or content
-                        if len(st) > 0:
-                            return [{"storage": st, "parent": t}]
-                    except:
-                        pass
-
         if not sub_storage_name:
             if is_annotations:
                 if container == "web-apps":
@@ -704,25 +642,22 @@ def web_match_storage(match_str, target=None):
             st = current_storage.get_storage_create("web-apps")
             return [{"storage": st, "parent": current_storage}]
 
+        # For hierarchical names, decide whether to expand by app or return the target-level storage
         if container == "web-apps":
             apps = get_uniq_apps(current_storage)
         else:
             apps = get_apps(current_storage)
 
-        if not apps and sub_storage_name:
-            # Fallback: if no apps found, try to resolve the storage at the target level
-            # This handles cases where apps haven't been loaded or scoped yet
-            try:
-                st = current_storage.get_storage_create(match_str)
-                return [{"storage": st, "parent": current_storage}]
-            except:
-                pass
+        # If no apps are found, or we are in a non-expansion context,
+        # we fall back to core matching (which will return the target-level storage).
+        if not apps:
+            return match_storage(match_str, current_storage)
 
         to_return = []
         for app in apps:
-            st = current_storage.get_storage_create(
-                sub_storage_name, parent_id=app["id"]
-            )
+            # When expanding, we maintain the full hierarchical name to ensure
+            # the storage can find its table, but scope it to the app's parent_id.
+            st = current_storage.get_storage_create(match_str, parent_id=app["id"])
             item = {"parent": app, "storage": st}
             if hasattr(current_storage, "name"):
                 item["target_name"] = current_storage.name
@@ -734,7 +669,7 @@ def web_match_storage(match_str, target=None):
         return to_return
 
     # Fallback to core
-    return match_storage(match_str, target)
+    return match_storage(match_str, current_storage)
 
 
 async def mcp_server_user_interaction(prompt: str, msg_type: str = "ai-todo") -> dict:
