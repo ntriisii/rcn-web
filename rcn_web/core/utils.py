@@ -96,7 +96,6 @@ def is_in_scope(asset_identifier: str):
 def get_app_by_site(target_storage_obj, app_site: str):
     if not target_storage_obj:
         return None
-    print(f"getting app by site for {app_site}")
 
     if hasattr(target_storage_obj, "targets"):
         for t in target_storage_obj.targets.values():
@@ -553,7 +552,9 @@ async def fetch_remote_flows(event, scheduled_md):
     async with adapter._fetch_lock:
         url = "http://localhost:8082/GetFlowsAfterTimestmp"
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=5.0)
+            ) as session:
                 async with session.get(
                     url,
                     params={
@@ -565,6 +566,9 @@ async def fetch_remote_flows(event, scheduled_md):
                         flows = await resp.json()
                         if flows:
                             adapter.add_many(flows)
+        except aiohttp.ClientConnectorError:
+            # Silently skip if proxy isn't running - this is a periodic event
+            pass
         except Exception as e:
             rlog(f"Error fetching remote flows: {e}", level="error")
 
@@ -584,7 +588,9 @@ def web_match_storage(match_str, target=None):
     current_storage = target if target else get_storage()
     if hasattr(current_storage, "targets") and target is None:
         found_storages = []
-        for t in current_storage.targets.values():
+        for tname, t in current_storage.targets.items():
+            if tname == "__multi_target__":
+                continue
             found_storages.extend(web_match_storage(match_str, target=t))
         return found_storages
 
