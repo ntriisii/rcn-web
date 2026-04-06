@@ -29,70 +29,59 @@ def _resolve_storage(
     # 1. Specialized flows handling
     if storage_name == "flows":
         from rcn_web.core.utils import RemoteFlowsAdapter
-
         return RemoteFlowsAdapter.get_instance()
 
-    # 3. Try global storage resolution (Most direct fallback)
+    # 2. Resolve target context
     target_storage = get_storage()
-    if target_storage:
-        try:
-            if hasattr(target_storage, "targets") and target_storage.targets:
-                # If parent_id provided, prioritize the target that matches it
-                if pid:
-                    pid_str = str(pid)
-                    for tname, t in target_storage.targets.items():
-                        if tname == "__multi_target__":
-                            continue
-                        if str(t.id) == pid_str:
-                            # Use the specific target to create storage
-                            st = t.get_storage_create(storage_name, parent_id=int(pid))
-                            # Ensure the storage instance is actually scoped to this parent_id
-                            # get_storage_create might return a cached instance with a different parent_id
-                            if hasattr(st, "_parent_id"):
-                                st._parent_id = int(pid)
+    if not target_storage:
+        return None
 
-                            # DEBUG
-                            with open("/tmp/mcp_debug.log", "a") as f:
-                                f.write(
-                                    f"Resolved st: {st} with parent_id: {st.parent_id} for pid: {pid}\n"
-                                )
-                                f.write(f"Storage name: {st.storage_name}\n")
-                                try:
-                                    f.write(f"Count: {len(st)}\n")
-                                except:
-                                    f.write("Count failed\n")
-                            return st
+    active_target = target_storage
+    is_target_match = False
 
-                for tname, t in target_storage.targets.items():
-                    if tname == "__multi_target__":
-                        continue
-                    st = t.get_storage_create(storage_name)
-                    if len(st) > 0:
-                        return st
-                for tname, t in target_storage.targets.items():
-                    if tname != "__multi_target__":
-                        return t.get_storage_create(storage_name)
-            if hasattr(target_storage, "get_storage_create"):
-                return target_storage.get_storage_create(storage_name, parent_id=pid)
-        except Exception:
-            pass
+    if hasattr(target_storage, "targets") and target_storage.targets:
+        # Find the specific target if pid matches a Target ID
+        if pid:
+            pid_str = str(pid)
+            for tname, t in target_storage.targets.items():
+                if tname == "__multi_target__":
+                    continue
+                if str(t.id) == pid_str:
+                    active_target = t
+                    is_target_match = True
+                    break
 
-    # 2. Try project-specific matcher (Discovery / Fallback)
-    from rcn_web.core.utils import web_match_storage
+        # Default to first real target if no match or no pid
+        if not is_target_match:
+            for tname, t in target_storage.targets.items():
+                if tname != "__multi_target__":
+                    active_target = t
+                    break
 
-    matches = web_match_storage(storage_name)
-    if matches:
-        if pid is not None:
-            for m in matches:
-                st = m["storage"]
-                # Convert to str for comparison to handle int/str mismatch
-                if (hasattr(st, "parent_id") and str(st.parent_id) == str(pid)) or (
-                    hasattr(st, "_parent_id") and str(st._parent_id) == str(pid)
-                ):
-                    return st
-        return matches[0]["storage"]
+    # 3. Handle hierarchical storages (e.g. web-apps::app-flows)
+    if "::" in storage_name:
+        # If no pid provided, or pid was a Target ID, we want an unscoped global view
+        if pid is None or is_target_match:
+            try:
+                st = active_target.get_storage_create(storage_name)
+                # Disable the parent_id filter so we see data across all sub-entities
+                st._parent_id = None
+                if "length" in st.__dict__:
+                    del st.__dict__["length"]
+                return st
+            except Exception:
+                pass
 
-    return None
+        # If pid is provided and wasn't a Target ID, it's likely a sub-entity ID (e.g. App ID)
+        if pid:
+            try:
+                return active_target.get_storage_create(storage_name, parent_id=int(pid))
+            except (ValueError, TypeError):
+                return active_target.get_storage_create(storage_name, parent_id=pid)
+
+    # 4. Top-level resolution fallback
+    return active_target.get_storage_create(storage_name, parent_id=pid)
+
 
 
 # Create router using the standardized MCP routes from rcn-core
