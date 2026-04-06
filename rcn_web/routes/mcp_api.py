@@ -32,23 +32,37 @@ def _resolve_storage(
 
         return RemoteFlowsAdapter.get_instance()
 
-    # 2. Try project-specific matcher (Discovery / Fallback)
-    from rcn_web.core.utils import web_match_storage
-
-    matches = web_match_storage(storage_name)
-    if matches:
-        if pid is not None:
-            for m in matches:
-                st = m["storage"]
-                if hasattr(st, "parent_id") and str(st.parent_id) == str(pid):
-                    return st
-        return matches[0]["storage"]
-
     # 3. Try global storage resolution (Most direct fallback)
     target_storage = get_storage()
     if target_storage:
         try:
             if hasattr(target_storage, "targets") and target_storage.targets:
+                # If parent_id provided, prioritize the target that matches it
+                if pid:
+                    pid_str = str(pid)
+                    for tname, t in target_storage.targets.items():
+                        if tname == "__multi_target__":
+                            continue
+                        if str(t.id) == pid_str:
+                            # Use the specific target to create storage
+                            st = t.get_storage_create(storage_name, parent_id=int(pid))
+                            # Ensure the storage instance is actually scoped to this parent_id
+                            # get_storage_create might return a cached instance with a different parent_id
+                            if hasattr(st, "_parent_id"):
+                                st._parent_id = int(pid)
+
+                            # DEBUG
+                            with open("/tmp/mcp_debug.log", "a") as f:
+                                f.write(
+                                    f"Resolved st: {st} with parent_id: {st.parent_id} for pid: {pid}\n"
+                                )
+                                f.write(f"Storage name: {st.storage_name}\n")
+                                try:
+                                    f.write(f"Count: {len(st)}\n")
+                                except:
+                                    f.write("Count failed\n")
+                            return st
+
                 for tname, t in target_storage.targets.items():
                     if tname == "__multi_target__":
                         continue
@@ -62,6 +76,21 @@ def _resolve_storage(
                 return target_storage.get_storage_create(storage_name, parent_id=pid)
         except Exception:
             pass
+
+    # 2. Try project-specific matcher (Discovery / Fallback)
+    from rcn_web.core.utils import web_match_storage
+
+    matches = web_match_storage(storage_name)
+    if matches:
+        if pid is not None:
+            for m in matches:
+                st = m["storage"]
+                # Convert to str for comparison to handle int/str mismatch
+                if (hasattr(st, "parent_id") and str(st.parent_id) == str(pid)) or (
+                    hasattr(st, "_parent_id") and str(st._parent_id) == str(pid)
+                ):
+                    return st
+        return matches[0]["storage"]
 
     return None
 
