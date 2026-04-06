@@ -634,6 +634,15 @@ def web_match_storage(match_str, target=None):
         else:
             apps = get_apps(current_storage)
 
+        if not apps and sub_storage_name:
+            # Fallback: if no apps found, try to resolve the storage at the target level
+            # This handles cases where apps haven't been loaded or scoped yet
+            try:
+                st = current_storage.get_storage_create(match_str)
+                return [{"storage": st, "parent": current_storage}]
+            except:
+                pass
+
         to_return = []
         for app in apps:
             st = current_storage.get_storage_create(
