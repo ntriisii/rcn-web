@@ -23,6 +23,13 @@ from rcn_web.core.utils import get_storage, web_match_storage
 def _resolve_storage(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
+    """Wrapper for storage resolution to allow easier mocking in tests."""
+    return _resolve_storage_impl(storage_name, parent_id)
+
+
+def _resolve_storage_impl(
+    storage_name: str, parent_id: Optional[Union[int, str]] = None
+) -> Any:
     # Normalize parent_id
     pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
 
@@ -106,7 +113,10 @@ def test_resolve():
 @router.post("/describe-target")
 async def describe_target(req: Request):
     """Describe target and return storage preview information."""
-    payload = await req.json()
+    try:
+        payload = await req.json()
+    except Exception:
+        payload = {}
 
     # Use core utility to get storage
     target_storage = get_storage()

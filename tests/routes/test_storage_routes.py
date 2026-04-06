@@ -4,8 +4,8 @@ Tests cover:
 - /storage/getContent
 - /storage/addContent
 - /storage/addEntryAnnotation
-- /mcp/preview/generic
-- /mcp/view/generic
+- /mcp/preview
+- /mcp/view
 - /mcp/action
 """
 
@@ -100,54 +100,60 @@ class TestStorageAddEntryAnnotation:
         assert result["count"] == 1
 
 
-class TestMcpPreviewGeneric:
-    """Tests for /mcp/preview/generic endpoint."""
+class TestMcpPreview:
+    """Tests for standardized /mcp/preview endpoint."""
 
     def test_preview_happy_path(self, client):
-        mock_preview = {"count": 100, "columns": ["id", "url", "status"]}
-        with patch("rcn_web.routes.mcp_api.preview_storage", return_value=mock_preview):
+        mock_st = MagicMock()
+        mock_st.storage_name = "web-apps::app-links"
+        mock_st.get_text_preview.return_value = "Preview Data"
+        
+        with patch("rcn_web.routes.mcp_api._resolve_storage_impl", return_value=mock_st):
             response = client.post(
-                "/mcp/preview/generic",
-                json={"type": "web-apps::app-links"},
+                "/mcp/preview",
+                json={"collection": "web-apps::app-links"},
             )
             assert response.status_code == 200
-            assert response.json() == mock_preview
+            assert "Preview Data" in response.text
 
 
-class TestMcpViewGeneric:
-    """Tests for /mcp/view/generic endpoint."""
+class TestMcpView:
+    """Tests for standardized /mcp/view endpoint."""
 
     def test_view_happy_path(self, client):
-        mock_data = [
-            {"id": "entry-1", "url": "https://example.com/page1"},
-            {"id": "entry-2", "url": "https://example.com/page2"},
-        ]
-        with patch("rcn_web.routes.mcp_api.view_storage", return_value=mock_data):
+        mock_st = MagicMock()
+        mock_st.storage_name = "web-apps::app-links"
+        mock_st.get_view_data.return_value = [{"id": "entry-1", "url": "https://example.com/page1"}]
+        mock_st.compile_query.return_value = ("1=1", [])
+        mock_st.primary_key = "id"
+        mock_st.use_main_alias = False
+        
+        with patch("rcn_web.routes.mcp_api._resolve_storage_impl", return_value=mock_st):
             response = client.post(
-                "/mcp/view/generic",
-                json={"type": "web-apps::app-links", "page": 1, "limit": 100},
+                "/mcp/view",
+                json={"collection": "web-apps::app-links", "page": 1, "limit": 100},
             )
             assert response.status_code == 200
-            assert response.json() == mock_data
+            assert "url: https://example.com/page1" in response.text
 
 
 class TestMcpAction:
     """Tests for /mcp/action endpoint."""
 
     def test_action_endpoint(self, client):
-        mock_result = {"status": "success", "task_id": "task-123"}
-        with patch("rcn_web.routes.mcp_api.execute_action", return_value=mock_result):
-            response = client.post(
-                "/mcp/action",
-                json={
-                    "action": "delegate_to_acp",
-                    "params": {
-                        "app_name": "example.com",
-                        "agent_name": "gemini-3-flash",
-                        "instructions": "Analyze JS files",
-                        "storage_name": "web-apps::js-flows",
-                    },
-                },
-            )
-            assert response.status_code == 200
-            assert response.json() == mock_result
+        # rcn-core's MCP router handles /action by looking up in the registry
+        from rcn_core.mcp.registry import registry
+        
+        mock_action = MagicMock(return_value={"status": "success"})
+        registry.action("test_action")(mock_action)
+        
+        response = client.post(
+            "/mcp/action",
+            json={
+                "action": "test_action",
+                "params": {"foo": "bar"},
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        mock_action.assert_called_once_with(foo="bar")
