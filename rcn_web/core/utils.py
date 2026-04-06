@@ -604,6 +604,16 @@ def web_match_storage(match_str, target=None):
     sub_storage_name = "::".join(parts[1:])
 
     if container in ["web-apps", "all-web-apps", "apps"]:
+        # 1. Direct resolution fallback: if the name is a full hierarchical path,
+        # try to resolve it directly from the current storage context first.
+        if sub_storage_name:
+            try:
+                st = current_storage.get_storage_create(match_str)
+                if len(st) > 0:
+                    return [{"storage": st, "parent": current_storage}]
+            except:
+                pass
+
         if not sub_storage_name:
             if is_annotations:
                 if container == "web-apps":
