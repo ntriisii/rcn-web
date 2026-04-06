@@ -61,6 +61,19 @@ class ListStorage:
 
         return res[:limit]
 
+    def get_text_preview(self, filter=None) -> str:
+        items = self.get_view_data(limit=5)
+        from rcn_core.mcp.utils import format_entries_text
+
+        header = f"Storage: {self.storage_name}\nEntries: {len(self.data)}\n"
+        return header + format_entries_text(items, self.storage_name)
+
+    def get_text_view(self, page=1, limit=200, filter=None) -> str:
+        items = self.get_view_data(limit=limit)
+        from rcn_core.mcp.utils import format_entries_text
+
+        return format_entries_text(items, self.storage_name)
+
 
 import rcn_core.globals
 from rcn_core.decorators import rcn_event
@@ -157,7 +170,9 @@ def get_apps(target_storage_obj):
         return []
     if hasattr(target_storage_obj, "targets"):
         all_apps = []
-        for t in target_storage_obj.targets.values():
+        for tname, t in target_storage_obj.targets.items():
+            if tname == "__multi_target__":
+                continue
             all_apps.extend(get_apps(t))
         return all_apps
 
@@ -167,21 +182,27 @@ def get_apps(target_storage_obj):
 
 def get_uniq_apps(target_storage_obj) -> "list[dict]":
     # Late import to avoid circular dependency
-    from rcn_web.core.scope import get_inscope_domains
+    from rcn_web.core.scope import check_domain_in_scope
 
-    global _UNIQ_APPS_CACHE
-    ts_id = id(target_storage_obj)
-    current_time = time.time()
-
-    # if ts_id in _UNIQ_APPS_CACHE:
-    #     cache_entry = _UNIQ_APPS_CACHE[ts_id]
-    #     if current_time - cache_entry["timestamp"] < _UNIQ_APPS_CACHE_TTL:
-    #         return cache_entry["data"]
-
-    all_apps = get_apps(target_storage_obj)
-    if not all_apps:
+    if not target_storage_obj:
         return []
-    # print("the freaking apps length is", len(all_apps))
+
+    # 1. Collect apps with their associated target objects
+    apps_with_targets = []
+    if hasattr(target_storage_obj, "targets"):
+        for tname, t in target_storage_obj.targets.items():
+            if tname == "__multi_target__":
+                continue
+            apps = t.get_storage_create("web-apps").get()
+            for app in apps:
+                apps_with_targets.append((app, t))
+    else:
+        apps = target_storage_obj.get_storage_create("web-apps").get()
+        for app in apps:
+            apps_with_targets.append((app, target_storage_obj))
+
+    if not apps_with_targets:
+        return []
 
     found_hashes = []
     scope_data = dict()
@@ -193,7 +214,22 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         "js-flows",
         "js-secrets",
     ]
-    for app in all_apps:
+
+    for app, target in apps_with_targets:
+        # a. Validation against target-specific scope
+        target_scope = target.config.get("scope") if hasattr(target, "config") else None
+        if target_scope:
+            # Normalize wildcards for check_domain_in_scope
+            wildcards = target_scope.get("wildcards", [])
+            wildcards = [i.replace("*.", "").replace("*", "") for i in wildcards]
+            normalized_scope = {"wildcards": wildcards, "urls": target_scope.get("urls", [])}
+            if not check_domain_in_scope(app["site"], normalized_scope):
+                continue
+        # If no specific target scope, we fall back to global scope via is_in_scope
+        elif not is_in_scope(app["site"]):
+            continue
+
+        # b. Deduplication and data check
         chash_str = (
             str(app.get("content_length", ""))
             + str(app.get("port", ""))
@@ -204,6 +240,7 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         chash = int.from_bytes(
             hashlib.md5(chash_str.encode("utf-8")).digest(), "little"
         )
+        
         has_data = False
         if chash not in found_hashes:
             found_hashes.append(chash)
@@ -211,7 +248,8 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         else:
             for st_name in storage_mapping:
                 full_st_name = f"web-apps::{st_name}"
-                st = get_storage_create(full_st_name, parent_id=app["id"])
+                # Use the specific target to check for sub-storage data
+                st = target.get_storage_create(full_st_name, parent_id=app["id"])
                 if len(st) > 0:
                     has_data = True
                     break
@@ -219,12 +257,9 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         if has_data:
             scope_data[app["site"]] = app
 
-    in_scope_sites = [site for site in scope_data.keys() if is_in_scope(site)]
-
-    found_apps = [scope_data[site] for site in in_scope_sites if site in scope_data]
+    found_apps = list(scope_data.values())
     found_apps = sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
 
-    # _UNIQ_APPS_CACHE[ts_id] = {"timestamp": current_time, "data": found_apps}
     return found_apps
 
 
@@ -502,6 +537,19 @@ class RemoteFlowsAdapter(StorageMetaData):
             res = sorted(res, key=lambda x: float(x.get("timestamp", 0)))
 
         return res[:limit]
+
+    def get_text_preview(self, filter=None) -> str:
+        items = self.get_view_data(limit=5)
+        from rcn_core.mcp.utils import format_entries_text
+
+        header = f"Storage: {self.storage_name}\nEntries: {len(self._cache)}\n"
+        return header + format_entries_text(items, self.storage_name)
+
+    def get_text_view(self, page=1, limit=200, filter=None) -> str:
+        items = self.get_view_data(limit=limit)
+        from rcn_core.mcp.utils import format_entries_text
+
+        return format_entries_text(items, self.storage_name)
 
     def add_many(self, entries):
         if not entries:
