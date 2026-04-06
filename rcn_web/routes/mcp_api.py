@@ -16,7 +16,22 @@ def _resolve_storage(
 
         return RemoteFlowsAdapter.get_instance()
 
-    # 2. For sub-storages with a parent_id, resolve directly to ensure correct scoping
+    # 2. Try project-specific matcher (handles 'web-apps', 'web-apps::*', etc.)
+    matches = web_match_storage(storage_name)
+    if matches:
+        # If parent_id is provided, try to find the specific app context among matches
+        if parent_id is not None:
+            for m in matches:
+                st = m["storage"]
+                # Match by parent_id attribute (integer or string)
+                if hasattr(st, "parent_id") and str(st.parent_id) == str(parent_id):
+                    return st
+
+        # If no parent_id or no match found, but we have matches, return the first one
+        # This ensures 'web-apps' at the top level always returns the main collection
+        return matches[0]["storage"]
+
+    # 3. For sub-storages with a parent_id, resolve directly if matcher failed
     if "::" in storage_name and parent_id:
         try:
             from rcn_core.storage.bases import get_storage_create as gsc
@@ -25,21 +40,11 @@ def _resolve_storage(
         except (ValueError, TypeError, Exception):
             pass
 
-    # 3. Try project-specific matcher (handles 'web-apps', etc.)
-    matches = web_match_storage(storage_name)
-    if matches:
-        # If parent_id is provided, try to find the specific app context among matches
-        if parent_id is not None:
-            for m in matches:
-                st = m["storage"]
-                if hasattr(st, "parent_id") and str(st.parent_id) == str(parent_id):
-                    return st
-        return matches[0]["storage"]
-
     # 4. Global storage fallback (handles MultiTargetStorage context)
     target_storage = get_storage()
     if target_storage:
         try:
+            # MultiTargetStorage.get_storage_create handles default target logic
             return target_storage.get_storage_create(storage_name, parent_id=parent_id)
         except Exception:
             pass
