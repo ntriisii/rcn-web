@@ -478,6 +478,31 @@ class RemoteFlowsAdapter(StorageMetaData):
                 rlog(f"Error fetching flows by ID: {e}", level="error")
         return found_flows
 
+    def get_view_data(
+        self,
+        query_node=None,
+        limit=100,
+        after_id=None,
+        before_id=None,
+        sort_desc=True,
+    ):
+        res = self._cache
+        if query_node is not None:
+            res = [e for e in res if query_node.evaluate(e)]
+
+        # Simple ID-based pagination (ID is timestamp)
+        if after_id is not None:
+            res = [e for e in res if float(e.get("timestamp", 0)) > float(after_id)]
+        elif before_id is not None:
+            res = [e for e in res if float(e.get("timestamp", 0)) < float(before_id)]
+
+        if sort_desc:
+            res = sorted(res, key=lambda x: float(x.get("timestamp", 0)), reverse=True)
+        else:
+            res = sorted(res, key=lambda x: float(x.get("timestamp", 0)))
+
+        return res[:limit]
+
     def add_many(self, entries):
         if not entries:
             return []
@@ -584,7 +609,7 @@ def web_match_storage(match_str, target=None):
     if match_str == "flows":
         st = RemoteFlowsAdapter.get_instance()
         return [{"storage": st, "parent": get_storage()}]
-
+    
     current_storage = target if target else get_storage()
 
     # Priority 1: Direct resolution for hierarchical names that exist as actual tables.
@@ -598,7 +623,7 @@ def web_match_storage(match_str, target=None):
             return [{"storage": st, "parent": current_storage}]
         except:
             pass
-
+    
     if hasattr(current_storage, "targets") and target is None:
         found_storages = []
         for tname, t in current_storage.targets.items():
@@ -606,7 +631,7 @@ def web_match_storage(match_str, target=None):
                 continue
             found_storages.extend(web_match_storage(match_str, target=t))
         return found_storages
-
+    
     parts = match_str.split("::")
     is_annotations = parts[-1] == "annotations"
     if is_annotations:
