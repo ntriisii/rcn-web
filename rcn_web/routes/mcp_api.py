@@ -10,7 +10,7 @@ from rcn_web.core.utils import get_storage, web_match_storage
 def _resolve_storage(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
-    # Normalize parent_id (0 is often a placeholder)
+    # Normalize parent_id
     pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
 
     # 1. Specialized flows handling
@@ -19,7 +19,39 @@ def _resolve_storage(
 
         return RemoteFlowsAdapter.get_instance()
 
-    # 2. Try project-specific matcher (handles 'web-apps', 'web-apps::*', etc.)
+    # 2. Try global storage resolution first (Most direct)
+    target_storage = get_storage()
+    if target_storage:
+        try:
+            # If it's a MultiTargetStorage, ensure we pick a valid target
+            if hasattr(target_storage, "targets") and target_storage.targets:
+                # Try to match pid if provided
+                if pid:
+                    for t in target_storage.targets.values():
+                        if str(t.id) == str(pid):
+                            return t.get_storage_create(storage_name)
+
+                # Search across all targets for one that has this collection with data
+                for tname, t in target_storage.targets.items():
+                    if tname == "__multi_target__":
+                        continue
+                    st = t.get_storage_create(storage_name)
+                    # If it has data, this is likely the one we want
+                    if len(st) > 0:
+                        return st
+
+                # Fallback to first non-metadata target
+                for tname, t in target_storage.targets.items():
+                    if tname != "__multi_target__":
+                        return t.get_storage_create(storage_name)
+
+            # Direct resolution if it's a single TargetStorage
+            if hasattr(target_storage, "get_storage_create"):
+                return target_storage.get_storage_create(storage_name, parent_id=pid)
+        except Exception:
+            pass
+
+    # 3. Try project-specific matcher (Discovery / Fallback)
     matches = web_match_storage(storage_name)
     if matches:
         if pid is not None:
@@ -27,24 +59,17 @@ def _resolve_storage(
                 st = m["storage"]
                 if hasattr(st, "parent_id") and str(st.parent_id) == str(pid):
                     return st
-
-        # If no pid or no specific match, return the first one (top-level collection)
         return matches[0]["storage"]
 
-    # 3. For sub-storages with a parent_id, resolve directly if matcher failed
-    if "::" in storage_name and pid:
-        try:
-            from rcn_core.storage.bases import get_storage_create as gsc
+    # 4. Final Last Resort: Force load from current TARGET_DIR
+    import rcn_core.globals
+    from rcn_core.storage.target_storage import TargetStorage
 
-            return gsc(storage_name, parent_id=int(pid))
-        except (ValueError, TypeError, Exception):
-            pass
-
-    # 4. Global storage fallback (handles MultiTargetStorage context)
-    target_storage = get_storage()
-    if target_storage:
+    tdir = getattr(rcn_core.globals, "TARGET_DIR", None)
+    if tdir and os.path.exists(tdir):
         try:
-            return target_storage.get_storage_create(storage_name, parent_id=pid)
+            ts = TargetStorage.load(os.path.basename(tdir.rstrip("/")), tdir)
+            return ts.get_storage_create(storage_name)
         except Exception:
             pass
 

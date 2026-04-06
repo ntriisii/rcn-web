@@ -73,7 +73,6 @@ dlls = ctypes.CDLL("libc.so.6")
 # NOTE: remove the root_path or include as a cli argument
 app = FastAPI(
     lifespan=rcn_core.globals.POOL_EXECUTOR,
-    root_path="/new-target",
     extra={
         "middleware": []
     },  # Potential fix for websocket 403s if related to middleware
