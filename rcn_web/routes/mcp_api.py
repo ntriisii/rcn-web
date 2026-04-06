@@ -79,7 +79,15 @@ def _resolve_storage(
             except (ValueError, TypeError):
                 return active_target.get_storage_create(storage_name, parent_id=pid)
 
-    # 4. Top-level resolution fallback
+    # 4. Handle top-level collections (e.g. web-apps)
+    # If pid was a Target ID, use it. If not, don't use it for web-apps (it might be an app ID)
+    if storage_name in ["web-apps", "all-web-apps", "apps"]:
+        if is_target_match:
+            return active_target.get_storage_create(storage_name, parent_id=pid)
+        else:
+            return active_target.get_storage_create(storage_name)
+
+    # 5. Top-level resolution fallback
     return active_target.get_storage_create(storage_name, parent_id=pid)
 
 
