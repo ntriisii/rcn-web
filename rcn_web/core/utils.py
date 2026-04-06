@@ -605,14 +605,21 @@ def web_match_storage(match_str, target=None):
 
     if container in ["web-apps", "all-web-apps", "apps"]:
         # 1. Direct resolution fallback: if the name is a full hierarchical path,
-        # try to resolve it directly from the current storage context first.
-        if sub_storage_name:
-            try:
-                st = current_storage.get_storage_create(match_str)
-                if len(st) > 0:
-                    return [{"storage": st, "parent": current_storage}]
-            except:
-                pass
+        # try to resolve it directly from any available target storage.
+        if sub_storage_name and hasattr(current_storage, "targets"):
+            for tname, t in current_storage.targets.items():
+                if tname == "__multi_target__":
+                    continue
+                try:
+                    # Check if this specific target has the storage
+                    st = t.get_storage_create(match_str)
+                    # We check if it exists in the schema or has data
+                    if hasattr(t, "schema_cache") and match_str in t.schema_cache:
+                        return [{"storage": st, "parent": t}]
+                    if len(st) > 0:
+                        return [{"storage": st, "parent": t}]
+                except:
+                    pass
 
         if not sub_storage_name:
             if is_annotations:
