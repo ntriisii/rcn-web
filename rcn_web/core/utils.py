@@ -184,6 +184,16 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     # Late import to avoid circular dependency
     from rcn_web.core.scope import check_domain_in_scope
 
+    global _UNIQ_APPS_CACHE
+    ts_id = id(target_storage_obj)
+    current_time = time.time()
+
+    if ts_id in _UNIQ_APPS_CACHE:
+        cache_entry = _UNIQ_APPS_CACHE[ts_id]
+        if current_time - cache_entry["timestamp"] < _UNIQ_APPS_CACHE_TTL:
+            return cache_entry["data"]
+
+    t1 = current_time
     if not target_storage_obj:
         return []
 
@@ -259,6 +269,11 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
 
     found_apps = list(scope_data.values())
     found_apps = sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
+
+    if time.time() - t1 > 0.1:
+        print(f"DEBUG: get_uniq_apps took {time.time() - t1:.4f}s for {len(found_apps)} apps")
+
+    _UNIQ_APPS_CACHE[ts_id] = {"timestamp": time.time(), "data": found_apps}
 
     return found_apps
 

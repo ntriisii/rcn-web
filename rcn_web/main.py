@@ -117,6 +117,88 @@ def debug_paths():
     }
 
 
+@app.get("/debug/clear_caches")
+def debug_clear_caches():
+    from rcn_core.storage.bases import STORAGE_CACHE, TARGET_CACHE, _DB_CONNECTIONS
+    from rcn_web.core.utils import _UNIQ_APPS_CACHE
+    from rcn_web.flows.collect_js import JS_COLLECTED_FLOWS
+    from rcn_web.flows.collect_urls import COLLECTED_REQUEST_INFO
+    
+    s_size = len(STORAGE_CACHE)
+    t_size = len(TARGET_CACHE)
+    d_size = len(_DB_CONNECTIONS)
+    u_size = len(_UNIQ_APPS_CACHE)
+    
+    STORAGE_CACHE.clear()
+    TARGET_CACHE.clear()
+    
+    # Close and clear DB connections
+    import sqlite3
+    for conn in list(_DB_CONNECTIONS.values()):
+        try:
+            conn.close()
+        except:
+            pass
+    _DB_CONNECTIONS.clear()
+    
+    _UNIQ_APPS_CACHE.clear()
+    JS_COLLECTED_FLOWS.clear()
+    COLLECTED_REQUEST_INFO.clear()
+    
+    import gc
+    gc.collect()
+    
+    return {
+        "status": "cleared",
+        "cleared_counts": {
+            "STORAGE_CACHE": s_size,
+            "TARGET_CACHE": t_size,
+            "DB_CONNECTIONS": d_size,
+            "_UNIQ_APPS_CACHE": u_size
+        }
+    }
+
+
+@app.get("/debug/memory")
+def debug_memory():
+    import gc
+    import sys
+    from rcn_core.storage.bases import STORAGE_CACHE, TARGET_CACHE, _DB_CONNECTIONS
+    from rcn_web.core.utils import _UNIQ_APPS_CACHE
+    from rcn_web.flows.collect_js import JS_COLLECTED_FLOWS
+    from rcn_web.flows.collect_urls import COLLECTED_REQUEST_INFO
+    
+    # Try to find large objects
+    objs = gc.get_objects()
+    large_objs = []
+    for obj in objs:
+        try:
+            # sys.getsizeof is shallow, but it's a start
+            size = sys.getsizeof(obj)
+            if size > 1024 * 1024:  # > 1MB
+                large_objs.append({
+                    "type": str(type(obj)),
+                    "size_mb": size / 1024 / 1024,
+                    "repr": str(obj)[:100]
+                })
+        except:
+            pass
+            
+    large_objs.sort(key=lambda x: x["size_mb"], reverse=True)
+    
+    return {
+        "STORAGE_CACHE_size": len(STORAGE_CACHE),
+        "TARGET_CACHE_size": len(TARGET_CACHE),
+        "DB_CONNECTIONS_size": len(_DB_CONNECTIONS),
+        "_UNIQ_APPS_CACHE_size": len(_UNIQ_APPS_CACHE),
+        "JS_COLLECTED_FLOWS_size": len(JS_COLLECTED_FLOWS),
+        "COLLECTED_REQUEST_INFO_size": len(COLLECTED_REQUEST_INFO),
+        "YAML_FILE_CONTENT_keys": list(rcn_core.globals.YAML_FILE_CONTENT.keys()),
+        "YAML_CONTEXT_size": len(rcn_core.globals.YAML_CONTEXT),
+        "large_objects": large_objs[:20]
+    }
+
+
 @app.on_event("startup")
 @repeat_every(seconds=TimeEvent().interval, raise_exceptions=True)
 async def run_time_events():
