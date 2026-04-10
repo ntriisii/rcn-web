@@ -216,7 +216,7 @@ def get_target_for_site(target_storage_obj, site):
 
     mts = get_target_storage()
     for target_data in mts.targets_storage.get():
-        config = target_data.get("config")
+        config = get_target_config(target_data["name"])
         scope = config.get("scope") if isinstance(config, dict) else None
         if not scope or not isinstance(scope, dict):
             continue
@@ -245,7 +245,7 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     targets_data = mts.targets_storage.get()
     targets_info = []
     for target_data in targets_data:
-        config = target_data.get("config")
+        config = get_target_config(target_data["name"])
         if not isinstance(config, dict):
             continue
         scope = config.get("scope")
