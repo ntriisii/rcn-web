@@ -62,11 +62,21 @@ async def handle_scanning_entries(content):
 
         # get the URL storage related to the application and
         # create if not there and store the vulns there
-        src_url_storage = get_storage_create("web-apps::app-links", parent_id=app['id'])
+        src_url_storage_list = get_storage_create(
+            "web-apps::app-links", parent_id=app["id"]
+        )
+        if not src_url_storage_list:
+            continue
+        src_url_storage = src_url_storage_list[0]
         url_entries = src_url_storage.get()
 
         # store in the app scanning data only if the target path is /
-        nc_storage = get_storage_create("web-apps::nuclei-scanning", parent_id=app['id'])
+        nc_storage_list = get_storage_create(
+            "web-apps::nuclei-scanning", parent_id=app["id"]
+        )
+        if not nc_storage_list:
+            continue
+        nc_storage = nc_storage_list[0]
         site_vuln_ids = [i["template-id"] for i in nc_storage.get()]
         for entry in data:
             host, path = get_nuclei_host_and_path(entry["host"])
@@ -80,7 +90,6 @@ async def handle_scanning_entries(content):
                 # assume the URL is there
                 for uentry in url_entries:
                     if uentry["path"] == path and uentry["method"] == "GET":
-
                         # check the vuln checked if it is checked
                         uentry["vuln-checked"] = vuln_scanned
 
