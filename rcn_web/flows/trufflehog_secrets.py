@@ -28,7 +28,6 @@ TRF_RUNNING = False
 
 
 async def trufflehog_operate(flow):
-
     global TRF_FILE_URL_MAP
 
     fname = "".join(random.choice(string.ascii_letters) for i in range(20))
@@ -41,8 +40,12 @@ async def trufflehog_operate(flow):
 
 
 async def trufflehog_check_for_secrets():
-
-    global TRF_LAST_CHECK_TIME, TRF_CHECK_TIME, TRF_FILE_URL_MAP, TRF_CONTENT_HASH, TRF_RUNNING
+    global \
+        TRF_LAST_CHECK_TIME, \
+        TRF_CHECK_TIME, \
+        TRF_FILE_URL_MAP, \
+        TRF_CONTENT_HASH, \
+        TRF_RUNNING
 
     # dont hog the system with the processes
     ctime = time.time()
@@ -111,7 +114,6 @@ async def trufflehog_check_for_secrets():
 
 
 async def write_trufflehog_flow_content(flow, flow_path):
-
     async with aiof.open(flow_path, "w") as f:
         rheaders = flow["request-headers"]
         rcontent = flow["request-body"]
@@ -139,7 +141,6 @@ async def write_trufflehog_flow_content(flow, flow_path):
 
 
 async def trufflehog_store_data(s, extractor, all_content):
-
     # collect applications
     found_apps = defaultdict(list)
     for entry in all_content["data"]:
@@ -168,15 +169,19 @@ async def trufflehog_store_data(s, extractor, all_content):
             )
             continue
 
-        st = get_storage_create("web-apps::trufflehog-secrets", parent_id=app['id'])
-        st.add_many(
-            [
-                {
-                    "base-url": i["url"],
-                    "DetectorName": i["DetectorName"],
-                    "Raw": i["Raw"],
-                }
-                for i in data
-            ],
-            source="trufflehog",
+        st_list = get_storage_create(
+            "web-apps::trufflehog-secrets", parent_id=app["id"]
         )
+        if st_list:
+            st = st_list[0]
+            st.add_many(
+                [
+                    {
+                        "base-url": i["url"],
+                        "DetectorName": i["DetectorName"],
+                        "Raw": i["Raw"],
+                    }
+                    for i in data
+                ],
+                source="trufflehog",
+            )
