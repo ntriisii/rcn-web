@@ -31,9 +31,8 @@ async def add_note(
         if st_name == "web-apps":
             st = get_target_storage().get_storage_create(st_name)
         else:
-            st = get_storage_create(
-                st_name, parent_id=app["id"]
-            )
+            st_list = get_storage_create(st_name, parent_id=app["id"])
+            st = st_list[0] if st_list else None
     except Exception as e:
         raise ValueError(f"Storage '{st_name}' not found or error accessing it: {e}")
 
@@ -67,7 +66,11 @@ async def add_note(
         # This usually goes into the annotations storage anyway, linked to this entry.
         # But 'add_annotation' helper usually handles this logic.
 
-        annot_st = get_storage_create("web-apps::annotations", parent_id=app["id"])
+        annot_st_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+        if not annot_st_list:
+            raise ValueError("Annotations storage not found for app.")
+
+        annot_st = annot_st_list[0]
         entry = {
             "entry_id": entry_id,
             "key": note_key,

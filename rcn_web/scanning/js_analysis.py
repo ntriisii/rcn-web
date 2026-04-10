@@ -56,10 +56,12 @@ async def js_intelligence_monitor(event, scheduled_md):
 
                 inventory_entries = [r for r in results if r is not None]
                 if inventory_entries:
-                    js_inventory = get_storage_create(
+                    js_inventory_list = get_storage_create(
                         "web-apps::js-inventory", parent_id=app_id
                     )
-                    js_inventory.add_many(inventory_entries, source="js_monitor")
+                    if js_inventory_list:
+                        js_inventory = js_inventory_list[0]
+                        js_inventory.add_many(inventory_entries, source="js_monitor")
 
 
 async def handle_monitor_js_hash(session, semaphore, app, js_link):
@@ -96,12 +98,15 @@ async def handle_monitor_js_hash(session, semaphore, app, js_link):
                 return None
 
             current_hash = await get_js_hash(content)
-            js_inventory = get_storage_create(
+            js_inventory_list = get_storage_create(
                 "web-apps::js-inventory", parent_id=app["id"]
             )
 
+            if not js_inventory_list:
+                return None
+
             # Check inventory
-            existing = js_inventory.get_filtered(f"url = '{url}'")
+            existing = js_inventory_list[0].get_filtered(f"url = '{url}'")
             is_changed = True
             if existing:
                 if existing[0].get("hash") == current_hash:
@@ -166,13 +171,15 @@ async def process_js_file(app, url, content, content_hash, project_name="default
         all_findings.append({"type": "ppmap", "evidence": pp_result})
 
     # Store results in js-intelligence
-    js_intel = get_storage_create("web-apps::js-intelligence", parent_id=app["id"])
-    js_intel.add_many([{
-        "url": url,
-        "hash": content_hash,
-        "findings": json.dumps(all_findings),
-        "unpacked_path": unpacked_path,
-    }], source="js_pipeline")
+    js_intel_list = get_storage_create("web-apps::js-intelligence", parent_id=app["id"])
+    if js_intel_list:
+        js_intel = js_intel_list[0]
+        js_intel.add_many([{
+            "url": url,
+            "hash": content_hash,
+            "findings": json.dumps(all_findings),
+            "unpacked_path": unpacked_path,
+        }], source="js_pipeline")
 
     # 3. AI Delegation (Only if not third party)
     if not is_third_party(url, content):

@@ -98,9 +98,12 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
             continue
 
         # store in the app scanning data only if the target path is /
-        nc_storage = get_storage_create(
+        nc_storage_list = get_storage_create(
             "web-apps::nuclei-scanning", parent_id=app["id"]
         )
+        if not nc_storage_list:
+            continue
+        nc_storage = nc_storage_list[0]
         site_vuln_ids = [i["template-id"] for i in nc_storage.get()]
         for entry in data:
             host, path = get_nuclei_host_and_path(entry["host"])
@@ -135,7 +138,7 @@ async def crawl_application(event, scheduled_md):
             # TODO: don't use proxy and create a flow that can translate to a piped operation
             # to handle application data and what you want from it.
             from rcn_core.time_event import start_scheduled_process
-            
+
             try:
                 await start_scheduled_process(
                     f"rr katana -u {tmp_file_path} {kt_additional_args} ---chunks-per-host 1 -ob -jc -jsl -silent -aff -fx -j -proxy http://localhost:8081 -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -kf all -xhr -timeout 20 | jq -c 'del(.response.body) | del(.response.raw)' ",
@@ -269,9 +272,12 @@ async def application_fuzzing(event, scheduled_md, matched_storage=[]):
                     continue
 
                 # add the fuzzing results
-                fz_storage = get_storage_create(
+                fz_storage_list = get_storage_create(
                     "web-apps::fuzzing-data", parent_id=app["id"]
                 )
+                if not fz_storage_list:
+                    continue
+                fz_storage = fz_storage_list[0]
 
                 # Add all results to storage first
                 fz_storage.add_many(to_add, source="ffuf-fuzzing")

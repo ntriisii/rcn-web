@@ -124,39 +124,41 @@ def debug_clear_caches():
     from rcn_web.core.utils import _UNIQ_APPS_CACHE
     from rcn_web.flows.collect_js import JS_COLLECTED_FLOWS
     from rcn_web.flows.collect_urls import COLLECTED_REQUEST_INFO
-    
+
     s_size = len(STORAGE_CACHE)
     t_size = len(TARGET_CACHE)
     d_size = len(_DB_CONNECTIONS)
     u_size = len(_UNIQ_APPS_CACHE)
-    
+
     STORAGE_CACHE.clear()
     TARGET_CACHE.clear()
-    
+
     # Close and clear DB connections
     import sqlite3
+
     for conn in list(_DB_CONNECTIONS.values()):
         try:
             conn.close()
         except:
             pass
     _DB_CONNECTIONS.clear()
-    
+
     _UNIQ_APPS_CACHE.clear()
     JS_COLLECTED_FLOWS.clear()
     COLLECTED_REQUEST_INFO.clear()
-    
+
     import gc
+
     gc.collect()
-    
+
     return {
         "status": "cleared",
         "cleared_counts": {
             "STORAGE_CACHE": s_size,
             "TARGET_CACHE": t_size,
             "DB_CONNECTIONS": d_size,
-            "_UNIQ_APPS_CACHE": u_size
-        }
+            "_UNIQ_APPS_CACHE": u_size,
+        },
     }
 
 
@@ -168,7 +170,7 @@ def debug_memory():
     from rcn_web.core.utils import _UNIQ_APPS_CACHE
     from rcn_web.flows.collect_js import JS_COLLECTED_FLOWS
     from rcn_web.flows.collect_urls import COLLECTED_REQUEST_INFO
-    
+
     # Try to find large objects
     objs = gc.get_objects()
     large_objs = []
@@ -177,16 +179,18 @@ def debug_memory():
             # sys.getsizeof is shallow, but it's a start
             size = sys.getsizeof(obj)
             if size > 1024 * 1024:  # > 1MB
-                large_objs.append({
-                    "type": str(type(obj)),
-                    "size_mb": size / 1024 / 1024,
-                    "repr": str(obj)[:100]
-                })
+                large_objs.append(
+                    {
+                        "type": str(type(obj)),
+                        "size_mb": size / 1024 / 1024,
+                        "repr": str(obj)[:100],
+                    }
+                )
         except:
             pass
-            
+
     large_objs.sort(key=lambda x: x["size_mb"], reverse=True)
-    
+
     return {
         "STORAGE_CACHE_size": len(STORAGE_CACHE),
         "TARGET_CACHE_size": len(TARGET_CACHE),
@@ -196,7 +200,7 @@ def debug_memory():
         "COLLECTED_REQUEST_INFO_size": len(COLLECTED_REQUEST_INFO),
         "YAML_FILE_CONTENT_keys": list(rcn_core.globals.YAML_FILE_CONTENT.keys()),
         "YAML_CONTEXT_size": len(rcn_core.globals.YAML_CONTEXT),
-        "large_objects": large_objs[:20]
+        "large_objects": large_objs[:20],
     }
 
 
@@ -456,13 +460,14 @@ async def get_app(content: Request):
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
 
-        st = get_storage_create(storage_name, parent_id=app["id"])
+        st_list = get_storage_create(storage_name, parent_id=app["id"])
 
-        if not st:
+        if not st_list:
             return JSONResponse(
                 {"error": "storage cannot be found in app"}, status_code=404
             )
 
+        st = st_list[0]
         data = st.get_data_view(
             match_groups=match_groups,
             create_windows=create_windows,
@@ -542,11 +547,12 @@ async def get_entry_by_id(
     if not app:
         return JSONResponse({"error": "app not found"}, status_code=404)
 
-    st = get_storage_create(storage_name, parent_id=app["id"])
+    st_list = get_storage_create(storage_name, parent_id=app["id"])
 
-    if not st:
+    if not st_list:
         return JSONResponse("storage not found", status_code=404)
 
+    st = st_list[0]
     data = [i for i in st.get() if i["id"] == entry_id]
     if not data:
         return JSONResponse("entry not found", status_code=404)
@@ -599,14 +605,18 @@ async def get_all_annotations():
     for app in get_uniq_apps(target):
         # a. Get annotations for the app itself (annotations)
         try:
-            st_app = get_storage_create("web-apps::annotations", parent_id=app["id"])
-            annotations = st_app.get_annotations()
-            for annotation in annotations:
-                annotation["app_site"] = app["site"]
-                annotation["source_storage"] = (
-                    "web-apps"  # This maps to the 'web-apps' view
-                )
-                all_annotations.append(annotation)
+            st_app_list = get_storage_create(
+                "web-apps::annotations", parent_id=app["id"]
+            )
+            if st_app_list:
+                st_app = st_app_list[0]
+                annotations = st_app.get_annotations()
+                for annotation in annotations:
+                    annotation["app_site"] = app["site"]
+                    annotation["source_storage"] = (
+                        "web-apps"  # This maps to the 'web-apps' view
+                    )
+                    all_annotations.append(annotation)
         except:
             pass
 
@@ -622,15 +632,17 @@ async def get_all_annotations():
         ]
         for st_name in common_app_storages:
             try:
-                st = get_storage_create(
+                st_list = get_storage_create(
                     st_name if "::" in st_name else "web-apps::" + st_name,
                     parent_id=app["id"],
                 )
-                annotations = st.get_annotations()
-                for annotation in annotations:
-                    annotation["app_site"] = app["site"]
-                    annotation["source_storage"] = st_name
-                    all_annotations.append(annotation)
+                if st_list:
+                    st = st_list[0]
+                    annotations = st.get_annotations()
+                    for annotation in annotations:
+                        annotation["app_site"] = app["site"]
+                        annotation["source_storage"] = st_name
+                        all_annotations.append(annotation)
             except:
                 pass
 

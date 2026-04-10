@@ -163,6 +163,7 @@ async def add_gau_collected_data(request: Request) -> JSONResponse:
 @router.post("/addAnnotation")
 async def add_annotation(request: Request) -> JSONResponse:
     from rcn_core.storage.bases import add_annotation as global_add_annotation
+
     content = await request.json()
     site = content.get("site")
     entry_id = content.get("entry_id")
@@ -175,7 +176,13 @@ async def add_annotation(request: Request) -> JSONResponse:
         return JSONResponse({"added": False, "error": "App not found"}, status_code=404)
 
     # Use global add_annotation
-    global_add_annotation(entry_id=entry_id, storage_name=storage_name, key=key, value=value, parent_id=app['id'])
+    global_add_annotation(
+        entry_id=entry_id,
+        storage_name=storage_name,
+        key=key,
+        value=value,
+        parent_id=app["id"],
+    )
 
     return JSONResponse({"added": True})
 
@@ -183,6 +190,7 @@ async def add_annotation(request: Request) -> JSONResponse:
 @router.post("/getAnnotations")
 async def get_annotations(request: Request) -> JSONResponse:
     from rcn_core.storage.bases import get_storage_create
+
     content = await request.json()
     site = content.get("site")
     entry_id = content.get("entry_id")
@@ -190,9 +198,16 @@ async def get_annotations(request: Request) -> JSONResponse:
 
     app = get_app_by_site(get_target_storage(), site)
     if not app:
-        return JSONResponse({"annotations": [], "error": "App not found"}, status_code=404)
+        return JSONResponse(
+            {"annotations": [], "error": "App not found"}, status_code=404
+        )
 
-    st = get_storage_create(storage_name, parent_id=app['id'])
+    st_list = get_storage_create(storage_name, parent_id=app["id"])
+    if not st_list:
+        return JSONResponse(
+            {"annotations": [], "error": "Storage not found"}, status_code=404
+        )
+    st = st_list[0]
     annotations = st.get_annotations_for_entry(entry_id)
 
     return JSONResponse({"annotations": annotations})
@@ -200,33 +215,39 @@ async def get_annotations(request: Request) -> JSONResponse:
 
 from pydantic import BaseModel
 
+
 class AppPreviewRequest(BaseModel):
     identifiers: list[str | int]
+
 
 @router.post("/preview_apps")
 async def preview_apps(request: AppPreviewRequest):
     from rcn_core.storage.bases import get_storage_create
+
     st = get_target_storage()
     if not st:
         return JSONResponse("No storage loaded.", status_code=404)
-    
+
     apps = []
     for ident in request.identifiers:
         found = None
         # Try finding by ID first
         if isinstance(ident, int) or (isinstance(ident, str) and ident.isdigit()):
-             found = next((a for a in get_uniq_apps(st) if str(a['id']) == str(ident)), None)
-        
+            found = next(
+                (a for a in get_uniq_apps(st) if str(a["id"]) == str(ident)), None
+            )
+
         # If not found or not ID, try by site
         if not found and isinstance(ident, str):
-             found = get_app_by_site(st, ident)
-             
+            found = get_app_by_site(st, ident)
+
         if found:
-            if found not in apps: apps.append(found)
-    
+            if found not in apps:
+                apps.append(found)
+
     if not apps:
         return JSONResponse("No apps found.")
-        
+
     ai_payload = ""
     for app in apps:
         ai_payload += f"APP ID: {app['id']}\n"
@@ -234,15 +255,17 @@ async def preview_apps(request: AppPreviewRequest):
         for k, v in app.items():
             if k not in ["id", "timestamp", "parent_id"]:
                 ai_payload += f"{k}: {v}\n"
-        
+
         ai_payload += "\n\nApplication Annotations:\n"
-        
-        ann_st = get_storage_create("web-apps::annotations", parent_id=app['id'])
-        annotations = ann_st.get_all_entries()
-        
-        for annotation in annotations:
-             ai_payload += f" - [ID: {annotation['id']}] {annotation['key']}: {annotation.get('value', '')}\n"
-        
+
+        ann_st_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+        if ann_st_list:
+            ann_st = ann_st_list[0]
+            annotations = ann_st.get_all_entries()
+
+            for annotation in annotations:
+                ai_payload += f" - [ID: {annotation['id']}] {annotation['key']}: {annotation.get('value', '')}\n"
+
         ai_payload += "\n#######################\n"
-        
+
     return JSONResponse(ai_payload)

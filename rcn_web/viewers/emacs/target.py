@@ -96,7 +96,12 @@ from .dorks import arrange_github_dorks_views
 from .dorks import arrange_shodan_dorks_views
 
 from rcn_web import storage
-from rcn_web.core.utils import get_storage, get_target_storage, get_uniq_apps, get_app_by_site
+from rcn_web.core.utils import (
+    get_storage,
+    get_target_storage,
+    get_uniq_apps,
+    get_app_by_site,
+)
 from rcn_web.core.scope import get_scope_wildcards
 from rcn_core.storage.bases import (
     get_storage_create,
@@ -113,9 +118,10 @@ def get_cached_todos_status(app):
     Returns a string in the format "completed/total" or with green color if all completed.
     """
     try:
-        todos = get_storage_create(
-            "web-apps::annotations", parent_id=app["id"]
-        ).get_filtered("key LIKE 'todo%'")
+        st_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+        if not st_list:
+            return "0/0"
+        todos = st_list[0].get_filtered("key LIKE 'todo%'")
         if not todos:
             return "0/0"
 
@@ -141,9 +147,8 @@ def elisp_view_app_annotations(app_id):
         return {}
     app_name = app["site"]
 
-    annotations = get_storage_create(
-        "web-apps::annotations", parent_id=app["id"]
-    ).get_all_entries()
+    st_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+    annotations = st_list[0].get_all_entries() if st_list else []
 
     tabulated_format = [
         ["id", 15, True],
@@ -185,12 +190,9 @@ def elisp_view_app_todos(app_id):
         return {}
     app_name = app["site"]
 
-    todos = [
-        f"- {t['value']}"
-        for t in get_storage_create(
-            "web-apps::annotations", parent_id=app["id"]
-        ).get_filtered("key LIKE 'todo%'")
-    ]
+    st_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+    todos_entries = st_list[0].get_filtered("key LIKE 'todo%'") if st_list else []
+    todos = [f"- {t['value']}" for t in todos_entries]
 
     return {
         "buffer-name": f"*todos-{app_name}*",
@@ -313,10 +315,14 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
             s_name = storage_mapping.get(attr[0])
             if not s_name:
                 continue
-            src = get_storage_create("web-apps::" + s_name, parent_id=app["id"])
-            l = src.length
-            v = l
-            tbl[attr[0]] = v
+            src_list = get_storage_create("web-apps::" + s_name, parent_id=app["id"])
+            if src_list:
+                src = src_list[0]
+                l = src.length
+                v = l
+                tbl[attr[0]] = v
+            else:
+                tbl[attr[0]] = 0
 
         # calculate TODOs status using cache
         tbl["todos"] = get_cached_todos_status(app)
@@ -333,18 +339,42 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
 
     class _ListView:
         __slots__ = ("data", "length")
-        def __init__(self, d): self.data = d; self.length = len(d)
-        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+
+        def __init__(self, d):
+            self.data = d
+            self.length = len(d)
+
+        def get_view_data(
+            self,
+            query_node=None,
+            limit=100,
+            after_id=None,
+            before_id=None,
+            sort_desc=True,
+        ):
             res = self.data
             if query_node is not None:
                 res = [e for e in res if query_node.evaluate(e)]
             if after_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
-                if idx != -1: res = res[idx + 1:]
+                idx = next(
+                    (i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[idx + 1 :]
             elif before_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
-                if idx != -1: res = res[:idx]
-            if sort_desc: res = res[::-1]
+                idx = next(
+                    (
+                        i
+                        for i, e in enumerate(res)
+                        if str(e.get("id")) == str(before_id)
+                    ),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[:idx]
+            if sort_desc:
+                res = res[::-1]
             return res[:limit]
 
     return make_preview_tabulated_entries(
@@ -416,9 +446,9 @@ def elisp_make_target_view_data():
                                 elisp_make_org_headline(
                                     name=" ".join(
                                         i
-                                        for i in get_target_storage()[ds].storage_name.split(
-                                            "-"
-                                        )
+                                        for i in get_target_storage()[
+                                            ds
+                                        ].storage_name.split("-")
                                     ),
                                     entries=get_target_storage()[ds].get_data_preview(),
                                     storage_name=get_target_storage()[ds].storage_name,
@@ -510,12 +540,13 @@ def elisp_make_app_view_data(app):
     app_url = app["scheme"] + "://" + re.sub(":[0-9]+", "", app["site"])
     dork = f"inurl:{app_url}"
 
-    annotations = [
-        f"- {a['key']}: {a['value']}"
-        for a in get_storage_create(
-            "web-apps::annotations", parent_id=app["id"]
-        ).get_all_entries()[:10]
-    ]
+    st_annot_list = get_storage_create("web-apps::annotations", parent_id=app["id"])
+    st_annot = st_annot_list[0] if st_annot_list else None
+    annotations = (
+        [f"- {a['key']}: {a['value']}" for a in st_annot.get_all_entries()[:10]]
+        if st_annot
+        else []
+    )
 
     app_data_raw = {
         "id": app["id"],
@@ -562,24 +593,42 @@ def elisp_make_app_view_data(app):
                     ),
                     elisp_make_org_headline(
                         name="App Flows",
-                        entries=get_storage_create(
-                            "web-apps::app-flows", parent_id=app["id"]
-                        ).get_data_preview(),
+                        entries=(
+                            get_storage_create(
+                                "web-apps::app-flows", parent_id=app["id"]
+                            )[0].get_data_preview()
+                            if get_storage_create(
+                                "web-apps::app-flows", parent_id=app["id"]
+                            )
+                            else {}
+                        ),
                         push_btn="rcn-view-show-app-flows",
                     ),
                     elisp_make_org_headline(
                         name="js flows",
-                        entries=get_storage_create(
-                            "web-apps::js-flows", parent_id=app["id"]
-                        ).get_data_preview(),
+                        entries=(
+                            get_storage_create(
+                                "web-apps::js-flows", parent_id=app["id"]
+                            )[0].get_data_preview()
+                            if get_storage_create(
+                                "web-apps::js-flows", parent_id=app["id"]
+                            )
+                            else {}
+                        ),
                         storage_name="web-apps::js-flows",
                     ),
                     *[
                         elisp_make_org_headline(
                             name=" ".join(i for i in ds.split("-")),
-                            entries=get_storage_create(
-                                "web-apps::" + ds, parent_id=app["id"]
-                            ).get_data_preview(),
+                            entries=(
+                                get_storage_create(
+                                    "web-apps::" + ds, parent_id=app["id"]
+                                )[0].get_data_preview()
+                                if get_storage_create(
+                                    "web-apps::" + ds, parent_id=app["id"]
+                                )
+                                else {}
+                            ),
                             push_btn=storages_push_btn_mapping.get(ds, None),
                             storage_name="web-apps::" + ds,
                         )
@@ -650,9 +699,8 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
         tabl_entries[tbl["id"]] = tbl
 
         # count the number of links in the app
-        tbl["links"] = get_storage_create(
-            "web-apps::app-links", parent_id=app["id"]
-        ).length
+        st_links_list = get_storage_create("web-apps::app-links", parent_id=app["id"])
+        tbl["links"] = st_links_list[0].length if st_links_list else 0
 
         # calculate TODOs status using cache
         tbl["todos"] = get_cached_todos_status(app)
@@ -665,18 +713,42 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
 
     class _ListView:
         __slots__ = ("data", "length")
-        def __init__(self, d): self.data = d; self.length = len(d)
-        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+
+        def __init__(self, d):
+            self.data = d
+            self.length = len(d)
+
+        def get_view_data(
+            self,
+            query_node=None,
+            limit=100,
+            after_id=None,
+            before_id=None,
+            sort_desc=True,
+        ):
             res = self.data
             if query_node is not None:
                 res = [e for e in res if query_node.evaluate(e)]
             if after_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
-                if idx != -1: res = res[idx + 1:]
+                idx = next(
+                    (i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[idx + 1 :]
             elif before_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
-                if idx != -1: res = res[:idx]
-            if sort_desc: res = res[::-1]
+                idx = next(
+                    (
+                        i
+                        for i, e in enumerate(res)
+                        if str(e.get("id")) == str(before_id)
+                    ),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[:idx]
+            if sort_desc:
+                res = res[::-1]
             return res[:limit]
 
     return make_preview_tabulated_entries(

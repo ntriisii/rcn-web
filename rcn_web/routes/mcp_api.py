@@ -19,7 +19,11 @@ def _resolve_storage(
 def _resolve_storage_impl(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
-    from rcn_web.core.utils import get_target_storage, RemoteFlowsAdapter, web_match_storage
+    from rcn_web.core.utils import (
+        get_target_storage,
+        RemoteFlowsAdapter,
+        web_match_storage,
+    )
 
     # Normalize parent_id
     pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
@@ -37,14 +41,14 @@ def _resolve_storage_impl(
     if "::" in storage_name:
         if pid:
             try:
-                return mts.get_storage_create(storage_name, parent_id=int(pid))
+                st_list = mts.get_storage_create(storage_name, parent_id=int(pid))
             except (ValueError, TypeError):
-                return mts.get_storage_create(storage_name, parent_id=pid)
+                st_list = mts.get_storage_create(storage_name, parent_id=pid)
+            return st_list[0] if st_list else None
         return mts.get_storage_create(storage_name)
 
     # 4. Top-level resolution
     return mts.get_storage_create(storage_name)
-
 
 
 # Create router using the standardized MCP routes from rcn-core
@@ -62,6 +66,7 @@ def test_resolve():
 async def describe_target(req: Request):
     """Describe target and return storage preview information."""
     from rcn_web.core.utils import get_target_storage
+
     try:
         payload = await req.json()
     except Exception:

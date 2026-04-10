@@ -398,10 +398,11 @@ async def mcp_ai_perform_fuzzing(event, scheduled_md):
             if l1_file and os.path.exists(l1_file):
                 os.remove(l1_file)
 
-            fz_storage = get_storage_create(
+            fz_storage_list = get_storage_create(
                 "web-apps::fuzzing-data", parent_id=app["id"]
             )
-            if to_add:
+            if fz_storage_list and to_add:
+                fz_storage = fz_storage_list[0]
                 fz_storage.add_many(to_add, source=source_id)
 
             # Add completion annotation

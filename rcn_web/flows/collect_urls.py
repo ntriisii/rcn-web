@@ -128,10 +128,11 @@ async def collect_url_content(flow):
     resp_length = len(flow["response-body"])
     req_body = flow["request-body"]
 
+    print(flow["response-body"][:100])
     title = re.findall(re.compile("<title>.*?</title>"), flow["response-body"])
-    if title:
-        title = title[0]
-
+    if title: title = title[0]
+    else: title = ""
+    
     return [
         {
             "url": url,
