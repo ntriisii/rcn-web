@@ -541,7 +541,7 @@ def web_match_storage(match_str, target=None):
                     st_list = mts.get_storage_create(
                         "web-apps", parent_id=app["id"]
                     )
-                    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+                    st = st_list[0] if st_list else None
                     if not st:
                         continue
                     item = {
@@ -553,14 +553,12 @@ def web_match_storage(match_str, target=None):
                 return to_return
 
             st_list = mts.get_storage_create("web-apps")
-            if isinstance(st_list, list):
-                return [{"storage": s, "parent": mts} for s in st_list if s is not None]
-            return [{"storage": st_list, "parent": mts}]
+            return [{"storage": s, "parent": mts} for s in st_list if s is not None]
 
         to_return = []
         for app in all_apps:
             st_list = mts.get_storage_create(match_str, parent_id=app["id"])
-            st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+            st = st_list[0] if st_list else None
             if not st:
                 continue
             item = {"parent": app, "storage": st}
