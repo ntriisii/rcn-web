@@ -44,9 +44,6 @@ from rcn_core.data_access import (
 _UNIQ_APPS_CACHE = {}
 _UNIQ_APPS_CACHE_TTL = 30
 
-# Alias for backward compat — callers should migrate to get_target_storage()
-get_root_storage = get_target_storage
-
 
 # --- Scope Utilities (Moved from Core) ---
 

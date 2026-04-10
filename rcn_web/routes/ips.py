@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import rcn_core.globals
 
 from rcn_web import storage
-from rcn_web.core.utils import get_root_storage
+from rcn_web.core.utils import get_target_storage
 
 
 router = APIRouter(prefix="/ips")
@@ -43,6 +43,6 @@ def get_ip_censys_data(ip: str):
 
 @router.get("/clearShodanIPs")
 def clear_shodan_ips():
-    ip_storage = get_root_storage().get_storage_create("shodan-scrapped-ips")
+    ip_storage = get_target_storage().get_storage_create("shodan-scrapped-ips")
     ip_storage.clear()
     ip_storage.storage_md_set("shodan-last-scanned-index", 0)

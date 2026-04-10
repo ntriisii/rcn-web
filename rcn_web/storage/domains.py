@@ -13,7 +13,7 @@ from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
 from rcn_core.utils import storage_automation_md_get_create
 from rcn_web.core.scope import get_scope_wildcards, get_config_wildcards
 from rcn_core.data_access import get_unprocessed_entries, get_storage as get_storage
-from rcn_web.core.utils import get_uniq_apps, web_match_storage, get_root_storage
+from rcn_web.core.utils import get_uniq_apps, web_match_storage, get_target_storage
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
 
@@ -22,7 +22,7 @@ target_storage = rcn_core.globals.TARGET_STORAGE
 
 def get_all_apps_domains(target=None):
     current_domains = set()
-    st = target if target else get_root_storage()
+    st = target if target else get_target_storage()
     if not st:
         return current_domains
 
@@ -82,7 +82,7 @@ async def handle_unprocessed_domains(event, scheduled_md):
 async def check_for_new_subdomains(event, scheduled_md, matched_storages=[]):
     rcn_flows = rcn_core.globals.RCN_FLOWS
     target = event.get("target")
-    st = target if target else get_root_storage()
+    st = target if target else get_target_storage()
 
     ctime = datetime.datetime.now().timestamp()
 
@@ -159,7 +159,7 @@ async def periodic_subdomain_bruteforcing(event, scheduled_md, matched_storages=
 
     # Check if init-recon has finished before running subdomain bruteforcing
     target = event.get("target")
-    target_storage = target if target else get_root_storage()
+    target_storage = target if target else get_target_storage()
     if not target_storage:
         return
 

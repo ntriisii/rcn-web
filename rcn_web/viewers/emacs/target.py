@@ -96,7 +96,7 @@ from .dorks import arrange_github_dorks_views
 from .dorks import arrange_shodan_dorks_views
 
 from rcn_web import storage
-from rcn_web.core.utils import get_storage, get_root_storage, get_uniq_apps, get_app_by_site
+from rcn_web.core.utils import get_storage, get_target_storage, get_uniq_apps, get_app_by_site
 from rcn_web.core.scope import get_scope_wildcards
 from rcn_core.storage.bases import (
     get_storage_create,
@@ -136,7 +136,7 @@ def get_cached_todos_status(app):
 
 
 def elisp_view_app_annotations(app_id):
-    app = get_app_by_site(get_root_storage(), app_id)
+    app = get_app_by_site(get_target_storage(), app_id)
     if not app:
         return {}
     app_name = app["site"]
@@ -179,7 +179,7 @@ def elisp_view_app_annotations(app_id):
 
 
 def elisp_view_app_todos(app_id):
-    app = get_app_by_site(get_root_storage(), app_id)
+    app = get_app_by_site(get_target_storage(), app_id)
 
     if not app:
         return {}
@@ -374,14 +374,14 @@ def elisp_make_target_view_data():
     github = arrange_github_dorks_views()
     shodan = arrange_shodan_dorks_views()
 
-    st = get_root_storage()
+    st = get_target_storage()
     org_entries = {
         "Apps count": len(get_uniq_apps(st)),
         "IPs count": st.get_storage_create("found-ips").length,
     }
 
-    for ds in get_root_storage().data_storages_names:
-        s = get_root_storage()[ds]
+    for ds in get_target_storage().data_storages_names:
+        s = get_target_storage()[ds]
         # TODO: change here
         if not hasattr(s, "_storage_metadata"):
             s._storage_metadata = dict()
@@ -416,14 +416,14 @@ def elisp_make_target_view_data():
                                 elisp_make_org_headline(
                                     name=" ".join(
                                         i
-                                        for i in get_root_storage()[ds].storage_name.split(
+                                        for i in get_target_storage()[ds].storage_name.split(
                                             "-"
                                         )
                                     ),
-                                    entries=get_root_storage()[ds].get_data_preview(),
-                                    storage_name=get_root_storage()[ds].storage_name,
+                                    entries=get_target_storage()[ds].get_data_preview(),
+                                    storage_name=get_target_storage()[ds].storage_name,
                                 )
-                                for ds in get_root_storage().data_storages_names
+                                for ds in get_target_storage().data_storages_names
                             ],
                         ],
                     },

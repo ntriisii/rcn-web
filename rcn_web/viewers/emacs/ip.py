@@ -11,7 +11,7 @@ from pentest_utils.viewers.emacs.utils import (
     basic_match_fn,
 )
 from .target import elisp_make_org_headline
-from rcn_web.core.utils import get_storage, get_root_storage, get_app_by_site
+from rcn_web.core.utils import get_storage, get_target_storage, get_app_by_site
 from rcn_web.storage.ip import get_shodan_ip_data
 from rcn_web.core.scope import get_inscope_domains
 from rcn_web.storage.ip import shodan_internetdb_port_scan
@@ -133,9 +133,9 @@ def extract_censys_relevant_data(censys_entry):
 
 
 def ips_all_sources_info():
-    internetdb_content = get_root_storage().get_storage_create("shodan-internetdb-ips").get()
-    shodan_content = get_root_storage().get_storage_create("shodan-scrapped-ips").get()
-    censys_content = get_root_storage().get_storage_create("censys-ips").get()
+    internetdb_content = get_target_storage().get_storage_create("shodan-internetdb-ips").get()
+    shodan_content = get_target_storage().get_storage_create("shodan-scrapped-ips").get()
+    censys_content = get_target_storage().get_storage_create("censys-ips").get()
     found_data = {}
 
     # MAYBE: just expand it in new list
@@ -225,7 +225,7 @@ def ips_all_sources_info():
 
 def elisp_make_ip_view(ip):
     def domain_to_app_site(domain):
-        st = get_root_storage()
+        st = get_target_storage()
         app = get_app_by_site(st, domain)
 
         # # add the application if in scope
@@ -242,9 +242,9 @@ def elisp_make_ip_view(ip):
 
         return link
 
-    internetdb_storage = get_root_storage().get_storage_create("shodan-internetdb-ips")
-    shodan_content = get_root_storage().get_storage_create("shodan-scrapped-ips")
-    censys_content = get_root_storage().get_storage_create("censys-ips")
+    internetdb_storage = get_target_storage().get_storage_create("shodan-internetdb-ips")
+    shodan_content = get_target_storage().get_storage_create("shodan-scrapped-ips")
+    censys_content = get_target_storage().get_storage_create("censys-ips")
 
     idb_ip = None
     if internetdb_storage:
@@ -383,7 +383,7 @@ def elisp_make_ip_view(ip):
 
         async def _idb_scan_and_store(ip):
             out = await shodan_internetdb_port_scan([ip])
-            idb = get_root_storage().get_storage_create("shodan-internetdb-ips")
+            idb = get_target_storage().get_storage_create("shodan-internetdb-ips")
             idb.add_many(out, source="censys")
 
         asyncio.create_task(_idb_scan_and_store(ip))

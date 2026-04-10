@@ -1,7 +1,7 @@
 from rcn_core.mcp import register_action
 from rcn_web.storage.utils import get_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create, add_annotation
-from rcn_web.core.utils import get_root_storage
+from rcn_web.core.utils import get_target_storage
 import asyncio
 from fastapi.responses import JSONResponse
 from typing import Optional, List
@@ -43,7 +43,7 @@ async def add_note(
     """
     Adds an annotation/note to an entry.
     """
-    st = get_root_storage()
+    st = get_target_storage()
     if not st:
         return JSONResponse(
             {"status": "error", "message": "Storage not initialized"}, 500
@@ -130,9 +130,9 @@ async def _trigger_security_task(app_name: str, config_xml: str, scan_type: str)
     import string
     from rcn_web.storage.utils import get_storage, get_app_by_site
     from rcn_core.storage.bases import add_annotation
-    from rcn_web.core.utils import get_root_storage
+    from rcn_web.core.utils import get_target_storage
 
-    st = get_root_storage()
+    st = get_target_storage()
     if not st: return {"status": "error", "message": "Storage not initialized"}
     
     app = get_app_by_site(st, app_name)

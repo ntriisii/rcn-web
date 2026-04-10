@@ -28,7 +28,7 @@ from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
 from rcn_core.data_access import get_storage
 from rcn_web.config import *
-from rcn_web.core.utils import web_match_storage, get_app_by_site, get_root_storage
+from rcn_web.core.utils import web_match_storage, get_app_by_site, get_target_storage
 from rcn_core.utils import parse_json
 
 # from rcn_web.storage.url import handle_crawling_collected_urls
@@ -87,7 +87,7 @@ async def handle_nuclei_scanning_entries(content, source="nuclei-scanning"):
 
         found_apps[site].append(entry)
 
-    s = get_root_storage()
+    s = get_target_storage()
     for site in found_apps:
         app = get_app_by_site(s, site)
         data = found_apps[site]

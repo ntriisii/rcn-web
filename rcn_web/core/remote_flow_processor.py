@@ -1,6 +1,6 @@
 from rcn_core.log import rlog
 from rcn_core.data_access import get_storage, get_unprocessed_entries
-from rcn_web.core.utils import web_match_storage, get_app_by_site, get_root_storage
+from rcn_web.core.utils import web_match_storage, get_app_by_site, get_target_storage
 from rcn_core.storage.bases import get_storage_create
 from rcn_web.core.scope import flow_in_scope
 from collections import defaultdict
@@ -35,7 +35,7 @@ async def trufflehog_check_for_flow_secrets(event, scheduled_md):
                 rlog(f"Error in trufflehog_operate: {e}", level="error")
 
         if results:
-            await trufflehog_store_data(get_root_storage(), event, {"data": results})
+            await trufflehog_store_data(get_target_storage(), event, {"data": results})
 
 
 @rcn_event()
@@ -61,7 +61,7 @@ async def collect_in_scope_urls(event, scheduled_md):
                 rlog(f"Error in collect_url_content: {e}", level="error")
 
         if results:
-            await handle_collected_urls(get_root_storage(), event, results)
+            await handle_collected_urls(get_target_storage(), event, results)
 
 
 @rcn_event()
@@ -88,4 +88,4 @@ async def collect_js_files(event, scheduled_md):
                 rlog(f"Error in extract_js_files: {e}", level="error")
 
         if results:
-            await handle_collected_js_files(get_root_storage(), event, results)
+            await handle_collected_js_files(get_target_storage(), event, results)

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi import APIRouter
 
 from rcn_web import *
-from rcn_web.core.utils import get_storage, get_root_storage, get_app_by_site
+from rcn_web.core.utils import get_storage, get_target_storage, get_app_by_site
 from rcn_web.storage.utils import (
     get_storage_data as get_storage_data_matching,
 )
@@ -116,7 +116,7 @@ async def add_entry_annotation(req: Request):
     if isinstance(storage_names, str):
         storage_names = [storage_names]
 
-    target = get_root_storage()
+    target = get_target_storage()
     added_annotations = []
 
     # Prioritize app_ids if present, otherwise use app_names
