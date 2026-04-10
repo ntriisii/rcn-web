@@ -45,6 +45,15 @@ _UNIQ_APPS_CACHE = {}
 _UNIQ_APPS_CACHE_TTL = 30
 
 
+def get_target_config(target_name: str) -> dict:
+    """Return the YAML config dict for the named target."""
+    targets = rcn_core.globals.YAML_FILE_CONTENT.get("targets", {})
+    entry = targets.get(target_name, {})
+    if not isinstance(entry, dict):
+        return {}
+    return entry
+
+
 # --- Scope Utilities (Moved from Core) ---
 
 
@@ -143,7 +152,9 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     ]
 
     for app, target in apps_with_targets:
-        target_scope = target.config.get("scope") if hasattr(target, "config") else None
+        target_name = target.get("name") if isinstance(target, dict) else getattr(target, "name", None)
+        target_cfg = get_target_config(target_name) if target_name else {}
+        target_scope = target_cfg.get("scope")
         if target_scope:
             wildcards = target_scope.get("wildcards", [])
             wildcards = [i.replace("*.", "").replace("*", "") for i in wildcards]

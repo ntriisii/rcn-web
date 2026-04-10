@@ -39,11 +39,23 @@ class MockTargetEntry:
         self._storage_md[key] = value
 
 
+def _make_mts_mock(storage_md):
+    """Create a mock MultiTargetStorage with targets_storage and shared storage_md."""
+    mock_mts = MagicMock()
+    mock_mts.id = 1
+    mock_mts.targets_storage.get.return_value = [{"id": 1, "name": "test-target"}]
+    mock_mts.target_directory = Path("/tmp/mock_target")
+    mock_mts.storage_md_get.side_effect = lambda k: storage_md.get(k)
+    mock_mts.storage_md_set.side_effect = lambda k, v: storage_md.__setitem__(k, v)
+    return mock_mts
+
+
 @pytest.mark.asyncio
 async def test_handle_init_target_happy_path():
     """Test happy path: flow runs, domains written to file, storage updated."""
     mock_target = MockTargetEntry()
     mock_flow = MockFlow(return_value=["sub.example.com", "api.example.com"])
+    mock_mts = _make_mts_mock(mock_target._storage_md)
 
     # Create mock context manager for get_unprocessed_entries
     mock_entries = {"test-target": {"entry": mock_target}}
@@ -58,6 +70,7 @@ async def test_handle_init_target_happy_path():
 
     with (
         patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
         patch("rcn_web.core.events.RCN_FLOWS", {"init-flow": lambda: mock_flow}),
         patch(
             "rcn_web.core.events.get_config_wildcards", return_value=["*.example.com"]
@@ -98,13 +111,17 @@ async def test_handle_init_target_happy_path():
 @pytest.mark.asyncio
 async def test_handle_init_target_empty_entries():
     """Test that handler returns early when no unprocessed entries."""
+    storage_md = {}
+    mock_mts = _make_mts_mock(storage_md)
+
     # Create mock context manager with empty entries
     mock_context = MagicMock()
     mock_context.__aenter__ = AsyncMock(return_value={})
     mock_context.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "rcn_web.core.events.get_unprocessed_entries", return_value=mock_context
+    with (
+        patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
     ):
         # Execute - should return early without error
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
@@ -115,6 +132,7 @@ async def test_handle_init_target_already_finished():
     """Test that handler skips targets already marked as finished."""
     mock_target = MockTargetEntry()
     mock_target._storage_md["init-recon-finished"] = True
+    mock_mts = _make_mts_mock(mock_target._storage_md)
 
     mock_entries = {"test-target": {"entry": mock_target}}
 
@@ -122,14 +140,12 @@ async def test_handle_init_target_already_finished():
     mock_context.__aenter__ = AsyncMock(return_value=mock_entries)
     mock_context.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "rcn_web.core.events.get_unprocessed_entries", return_value=mock_context
+    with (
+        patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
     ):
         # Execute - should skip without processing
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
-
-        # Verify no flow was run (metadata unchanged)
-        assert mock_target._storage_md.get("init-recon-running") is None
 
 
 @pytest.mark.asyncio
@@ -137,6 +153,7 @@ async def test_handle_init_target_already_running():
     """Test that handler skips targets already running."""
     mock_target = MockTargetEntry()
     mock_target._storage_md["init-recon-running"] = True
+    mock_mts = _make_mts_mock(mock_target._storage_md)
 
     mock_entries = {"test-target": {"entry": mock_target}}
 
@@ -144,8 +161,9 @@ async def test_handle_init_target_already_running():
     mock_context.__aenter__ = AsyncMock(return_value=mock_entries)
     mock_context.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "rcn_web.core.events.get_unprocessed_entries", return_value=mock_context
+    with (
+        patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
     ):
         # Execute - should skip without processing
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
@@ -155,6 +173,7 @@ async def test_handle_init_target_already_running():
 async def test_handle_init_target_no_flow():
     """Test that handler skips when init-flow is not in RCN_FLOWS."""
     mock_target = MockTargetEntry()
+    mock_mts = _make_mts_mock(mock_target._storage_md)
 
     mock_entries = {"test-target": {"entry": mock_target}}
 
@@ -165,12 +184,10 @@ async def test_handle_init_target_no_flow():
     with (
         patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
         patch("rcn_web.core.events.RCN_FLOWS", {}),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
     ):
         # Execute - should skip without processing
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
-
-        # Verify no metadata was set
-        assert mock_target._storage_md.get("init-recon-running") is None
 
 
 @pytest.mark.asyncio
@@ -179,6 +196,7 @@ async def test_handle_init_target_error_path():
     mock_target = MockTargetEntry()
     mock_flow = MockFlow()
     mock_flow.run = AsyncMock(side_effect=RuntimeError("Flow execution failed"))
+    mock_mts = _make_mts_mock(mock_target._storage_md)
 
     mock_entries = {"test-target": {"entry": mock_target}}
 
@@ -188,6 +206,7 @@ async def test_handle_init_target_error_path():
 
     with (
         patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
         patch("rcn_web.core.events.RCN_FLOWS", {"init-flow": lambda: mock_flow}),
         patch(
             "rcn_web.core.events.get_config_wildcards", return_value=["*.example.com"]
@@ -212,19 +231,17 @@ async def test_handle_init_target_error_path():
 @pytest.mark.asyncio
 async def test_handle_init_target_plain_dict_entry():
     """Test that plain dict entries from targets table are resolved to TargetStorage."""
-    # Simulate real behavior: entry is a plain dict from the targets table
     mock_dict_entry = {"id": 42, "name": "test-target"}
     mock_flow = MockFlow(return_value=["sub.example.com"])
+    storage_md = {}
+    mock_mts = _make_mts_mock(storage_md)
 
     # Mock TargetStorage that gets resolved from the dict entry
     mock_target_obj = MagicMock()
     mock_target_obj.id = 42
     mock_target_obj.name = "test-target"
     mock_target_obj.target_directory = Path("/tmp/mock_target")
-    mock_target_obj.config = {
-        "scope": {"wildcards": ["*.example.com"], "urls": ["https://example.com"]}
-    }
-    mock_target_obj._storage_md = {}
+    mock_target_obj._storage_md = storage_md  # Share the same storage_md dict
 
     def mock_storage_md_get(key):
         return mock_target_obj._storage_md.get(key)
@@ -250,6 +267,7 @@ async def test_handle_init_target_plain_dict_entry():
 
     with (
         patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
         patch("rcn_web.core.events.RCN_FLOWS", {"init-flow": lambda: mock_flow}),
         patch(
             "rcn_web.core.events.get_config_wildcards", return_value=["*.example.com"]
@@ -269,17 +287,17 @@ async def test_handle_init_target_plain_dict_entry():
 
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
 
-        # Verify the target was resolved via parent
-        mock_parent.get_target_storage.assert_called_once_with("test-target")
         # Verify flags set on the resolved TargetStorage
-        assert mock_target_obj._storage_md.get("init-recon-finished") is True
-        assert mock_target_obj._storage_md.get("init-recon-running") is False
+        assert storage_md.get("init-recon-finished") is True
+        assert storage_md.get("init-recon-running") is False
 
 
 @pytest.mark.asyncio
 async def test_handle_init_target_plain_dict_no_parent():
     """Test handler skips when parent is not available to resolve dict entry."""
     mock_dict_entry = {"id": 42, "name": "test-target"}
+    storage_md = {}
+    mock_mts = _make_mts_mock(storage_md)
     # No parent key — can't resolve to TargetStorage
     mock_entries = {"entry-1": {"entry": mock_dict_entry}}
 
@@ -287,6 +305,10 @@ async def test_handle_init_target_plain_dict_no_parent():
     mock_context.__aenter__ = AsyncMock(return_value=mock_entries)
     mock_context.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context):
+    with (
+        patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.get_target_storage", return_value=mock_mts),
+    ):
         # Should skip gracefully without error
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
+

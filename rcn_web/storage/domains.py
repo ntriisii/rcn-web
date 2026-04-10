@@ -13,7 +13,7 @@ from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
 from rcn_core.utils import storage_automation_md_get_create
 from rcn_web.core.scope import get_scope_wildcards, get_config_wildcards
 from rcn_core.data_access import get_unprocessed_entries, get_storage as get_storage
-from rcn_web.core.utils import get_uniq_apps, web_match_storage, get_target_storage
+from rcn_web.core.utils import get_uniq_apps, web_match_storage, get_target_storage, get_target_config
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
 
@@ -182,8 +182,10 @@ async def periodic_subdomain_bruteforcing(event, scheduled_md, matched_storages=
 
     if target:
         # Use target specific config to get wildcards
+        target_name = target.get("name") if isinstance(target, dict) else getattr(target, "name", None)
+        target_cfg = get_target_config(target_name) if target_name else {}
         wildcards = get_config_wildcards(
-            {"scope": target.config.get("scope", []), "multitarget": False}
+            {"scope": target_cfg.get("scope", []), "multitarget": False}
         )
     else:
         wildcards = get_scope_wildcards([])
