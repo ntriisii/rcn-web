@@ -172,10 +172,27 @@ async def handle_collected_urls(st, extractor, content):
             continue
 
         d = found_sites_data[site]
-        url_storage = get_storage_create("web-apps::app-links", parent_id=app_st["id"])
-        app_flow_storage = get_storage_create(
+        url_storage_list = get_storage_create(
+            "web-apps::app-links", parent_id=app_st["id"]
+        )
+        app_flow_storage_list = get_storage_create(
             "web-apps::app-flows", parent_id=app_st["id"]
         )
+        js_flow_storage_list = get_storage_create(
+            "web-apps::js-flows", parent_id=app_st["id"]
+        )
+
+        if (
+            not url_storage_list
+            or not app_flow_storage_list
+            or not js_flow_storage_list
+        ):
+            continue
+
+        url_storage = url_storage_list[0]
+        app_flow_storage = app_flow_storage_list[0]
+        js_flow_storage = js_flow_storage_list[0]
+
         js_flow_storage = get_storage_create(
             "web-apps::js-flows", parent_id=app_st["id"]
         )
@@ -305,9 +322,12 @@ async def handle_collected_request_info(st, extractor, content):
         if not app_st:
             continue
 
-        req_storage = get_storage_create(
+        req_storage_list = get_storage_create(
             "web-apps::requests-collected-info", parent_id=app_st["id"]
         )
+        if not req_storage_list:
+            continue
+        req_storage = req_storage_list[0]
 
         items_to_add = found_sites_data[site]
         collected = []
