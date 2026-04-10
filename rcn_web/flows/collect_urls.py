@@ -194,10 +194,6 @@ async def handle_collected_urls(st, extractor, content):
         app_flow_storage = app_flow_storage_list[0]
         js_flow_storage = js_flow_storage_list[0]
 
-        js_flow_storage = get_storage_create(
-            "web-apps::js-flows", parent_id=app_st["id"]
-        )
-
         app_flows_to_add = []
         js_flows_to_add = []
 
