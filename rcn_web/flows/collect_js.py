@@ -138,40 +138,44 @@ async def js_analysis_run_flow_on_files(s, paths, app_name, file_to_flow_map=Non
             links.append(i)
 
     if links:
-        lst = get_storage_create("web-apps::js-flows", parent_id=app["id"])
-        # Add proper source and original keys if missing, though logic implies they exist
-        links_to_add = []
-        for i in links:
-            source_file = i.get("source")
-            flow_id = None
-            if file_to_flow_map and source_file in file_to_flow_map:
-                flow_id = file_to_flow_map[source_file]
+        lst_list = get_storage_create("web-apps::js-flows", parent_id=app["id"])
+        if lst_list:
+            lst = lst_list[0]
+            # Add proper source and original keys if missing, though logic implies they exist
+            links_to_add = []
+            for i in links:
+                source_file = i.get("source")
+                flow_id = None
+                if file_to_flow_map and source_file in file_to_flow_map:
+                    flow_id = file_to_flow_map[source_file]
 
-            if not flow_id:
-                flow_id = str(i.get("flow-id")) if i.get("flow-id") else None
+                if not flow_id:
+                    flow_id = str(i.get("flow-id")) if i.get("flow-id") else None
 
-            links_to_add.append(
-                {
-                    "url": i.get("url"),
-                    "path": i.get("url"),
-                    "source": i.get("source"),
-                    "original": i.get("original"),
-                    "flow-id": flow_id,
-                }
-            )
+                links_to_add.append(
+                    {
+                        "url": i.get("url"),
+                        "path": i.get("url"),
+                        "source": i.get("source"),
+                        "original": i.get("original"),
+                        "flow-id": flow_id,
+                    }
+                )
 
-        lst.add_many(links_to_add, source="jsluice")
+            lst.add_many(links_to_add, source="jsluice")
 
     if secrets:
-        sst = get_storage_create("web-apps::js-secrets", parent_id=app["id"])
-        sst.add_many(
-            [
-                {
-                    "source": i.get("source"),
-                    "reason": i.get("reason"),
-                    "match": i.get("match"),
-                }
-                for i in secrets
-            ],
-            source="jsluice",
-        )
+        sst_list = get_storage_create("web-apps::js-secrets", parent_id=app["id"])
+        if sst_list:
+            sst = sst_list[0]
+            sst.add_many(
+                [
+                    {
+                        "source": i.get("source"),
+                        "reason": i.get("reason"),
+                        "match": i.get("match"),
+                    }
+                    for i in secrets
+                ],
+                source="jsluice",
+            )
