@@ -68,8 +68,9 @@ def is_in_scope(asset_identifier: str):
 
 def get_app_by_site(target_storage_obj, app_site: str):
     for st in target_storage_obj.get_storage_create("web-apps"):
-        if st.storage_name not in st._schema_cache:
+        if st.storage_name not in st.schema_cache:
             continue
+
         with st.get_connection() as conn:
             cursor = conn.execute(
                 f"SELECT * FROM {st.table_name} WHERE (site = ? OR site LIKE ?)",
@@ -262,7 +263,6 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
         "method",
         "tech",
         "status_code",
-        "technologies",
         "input_domain",
         "port",
         "site",
@@ -288,6 +288,9 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
 
         target_id = None
         if domain:
+            filtered_app["site"] = domain
+            filtered_app["input_domain"] = filtered_app.get("input")
+            filtered_app["tech"] = ", ".join(filtered_app["tech"])
             for t_info in targets_info:
                 if check_domain_in_scope(domain, t_info["check_scope"]):
                     target_id = t_info["id"]
@@ -299,9 +302,12 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     # 3. Add apps for each target
     all_added = []
     for target_id, target_apps in target_groups.items():
-        st = mts.get_storage_create("web-apps", parent_id=target_id)[0]
+        st_list = mts.get_storage_create("web-apps", parent_id=target_id)
+        if not st_list:
+            continue
+        st = st_list[0]
         added = st.add_many(target_apps)
-        all_added.extend(target_apps)
+        all_added.extend(added or target_apps)
 
     return all_added
 
@@ -314,8 +320,9 @@ def delete_app_by_site(target_storage_obj, site):
         return
 
     for st in target_storage_obj.get_storage_create("web-apps"):
-        if st.storage_name not in st._schema_cache:
+        if st.storage_name not in st.schema_cache:
             continue
+
         with st.get_connection() as conn:
             conn.execute(f"DELETE FROM {st.table_name} WHERE id = ?", (app["id"],))
             conn.commit()
@@ -610,7 +617,7 @@ def web_match_storage(match_str, target=None):
                         continue
                     item = {
                         "parent": app,
-                        "storage": st.annotations_storage,
+                        "storage": st.get_annotations_storage(),
                         "reference_storage": st,
                     }
                     to_return.append(item)
@@ -627,7 +634,7 @@ def web_match_storage(match_str, target=None):
                 continue
             item = {"parent": app, "storage": st}
             if is_annotations:
-                item["storage"] = st.annotations_storage
+                item["storage"] = st.get_annotations_storage()
                 item["reference_storage"] = st
             to_return.append(item)
         return to_return
