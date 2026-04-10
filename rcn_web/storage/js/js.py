@@ -62,5 +62,7 @@ async def js_analysis_run_flow_on_files(paths, app_name):
     # NOTE: the app would be already created from the caller function
     app = get_app_by_site(st, app_name)
 
-    js_storage = get_storage_create("web-apps::js-analysis", parent_id=app['id'])
-    js_storage.add_many(out, source="jsluice")
+    js_storage_list = get_storage_create("web-apps::js-analysis", parent_id=app["id"])
+    if js_storage_list:
+        js_storage = js_storage_list[0]
+        js_storage.add_many(out, source="jsluice")
