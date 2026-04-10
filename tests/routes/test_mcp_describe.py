@@ -13,8 +13,7 @@ def client():
 
 
 def test_describe_target_no_storage(client):
-    # Patch where it's used
-    with patch("rcn_web.core.utils.get_root_storage", return_value=None):
+    with patch("rcn_web.core.utils.get_target_storage", return_value=None):
         response = client.post("/mcp/describe-target", json={"target": "some-id"})
         assert response.status_code == 404
         assert response.json() == {"error": "No target storage found"}
@@ -31,7 +30,7 @@ def test_describe_target_success(client):
     mock_st.get.return_value = [{"col1": "val1", "col2": "val2"}]
 
     with (
-        patch("rcn_web.core.utils.get_root_storage", return_value=mock_target_storage),
+        patch("rcn_web.core.utils.get_target_storage", return_value=mock_target_storage),
         # describe_target calls _resolve_storage which calls _resolve_storage_impl
         patch("rcn_web.routes.mcp_api._resolve_storage_impl", return_value=mock_st),
     ):
@@ -62,7 +61,7 @@ def test_describe_target_partial_failure(client):
         return None
 
     with (
-        patch("rcn_web.core.utils.get_root_storage", return_value=mock_target_storage),
+        patch("rcn_web.core.utils.get_target_storage", return_value=mock_target_storage),
         patch("rcn_web.routes.mcp_api._resolve_storage_impl", side_effect=side_effect),
     ):
         response = client.post("/mcp/describe-target", json={"target": "target-123"})

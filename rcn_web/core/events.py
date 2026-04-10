@@ -6,24 +6,19 @@ from rcn_core.utils import uniq, storage_automation_md_get_create
 from rcn_core.globals import RCN_FLOWS
 from rcn_core.storage.bases import get_storage_create
 from rcn_web.core.scope import get_config_wildcards, get_config_urls
-from rcn_web.core.utils import web_match_storage, get_root_storage
+from rcn_web.core.utils import web_match_storage, get_target_storage
 from rcn_core.decorators import rcn_event
 
 
 def _resolve_target(item):
-    """Resolve a dict entry from the targets table to a TargetStorage object.
-
-    If the entry is already a rich object (e.g. from tests), return it as-is.
-    If it is a plain dict, look up the parent and resolve via
-    parent.get_target_storage(name).
-    """
+    """Resolve a dict entry from the targets table to a TargetStorage object."""
     target = item["entry"]
 
     # Already a rich object (e.g. MockTargetEntry in tests)
     if hasattr(target, "storage_md_get") and hasattr(target, "config"):
         return target
 
-    # Plain dict — need to resolve via parent
+    # Plain dict — resolve via parent (MultiTargetStorage)
     parent = item.get("parent")
     if parent is None:
         return None
@@ -32,17 +27,7 @@ def _resolve_target(item):
     if not target_name:
         return None
 
-    # parent may be MultiTargetStorage or another container with
-    # get_target_storage(name)
-    if hasattr(parent, "get_target_storage"):
-        return parent.get_target_storage(target_name)
-
-    # Try get_root_storage as fallback
-    root = get_root_storage()
-    if root and hasattr(root, "get_target_storage"):
-        return root.get_target_storage(target_name)
-
-    return None
+    return parent.get_target_storage(target_name)
 
 
 @rcn_event()

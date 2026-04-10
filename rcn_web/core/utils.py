@@ -23,7 +23,6 @@ from urllib.parse import urlparse, ParseResult
 import rcn_core.globals
 from rcn_core.decorators import rcn_event
 from rcn_core.log import rlog
-from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
 from rcn_core.storage.bases import (
     StorageMetaData,
     get_storage_create,
@@ -45,11 +44,8 @@ from rcn_core.data_access import (
 _UNIQ_APPS_CACHE = {}
 _UNIQ_APPS_CACHE_TTL = 30
 
-
-def get_root_storage():
-    """Return the MultiTargetStorage for the current target directory."""
-    ts = get_target_storage()
-    return ts
+# Alias for backward compat — callers should migrate to get_target_storage()
+get_root_storage = get_target_storage
 
 
 # --- Scope Utilities (Moved from Core) ---
@@ -68,34 +64,17 @@ def get_app_by_site(target_storage_obj, app_site: str):
     if not target_storage_obj:
         return None
 
-    if hasattr(target_storage_obj, "targets"):
-        for t in target_storage_obj.targets.values():
-            app = get_app_by_site(t, app_site)
-            if app:
-                return app
-        return None
-
-    st_list = target_storage_obj.get_storage_create("web-apps")
-    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
-    if not st:
-        return None
-
-    if st.storage_name not in st._schema_cache:
-        return None
-
-    with st.get_connection() as conn:
-        query = f"SELECT * FROM {st.table_name} WHERE (site = ? OR site LIKE ?)"
-        cursor = conn.execute(
-            query,
-            (
-                app_site,
-                f"{app_site}:%",
-            ),
-        )
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-
+    for st in target_storage_obj.get_storage_create("web-apps"):
+        if st.storage_name not in st._schema_cache:
+            continue
+        with st.get_connection() as conn:
+            cursor = conn.execute(
+                f"SELECT * FROM {st.table_name} WHERE (site = ? OR site LIKE ?)",
+                (app_site, f"{app_site}:%"),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
     return None
 
 
@@ -103,48 +82,31 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
     if not target_storage_obj:
         return None
 
-    if hasattr(target_storage_obj, "targets"):
-        for t in target_storage_obj.targets.values():
-            app = get_app_by_id(t, app_id)
-            if app:
-                return app
-        return None
-
-    st_list = target_storage_obj.get_storage_create("web-apps")
-    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
-    if not st:
-        return None
-    if st.storage_name not in st._schema_cache:
-        return None
-
-    with st.get_connection() as conn:
-        cursor = conn.execute(
-            f"SELECT * FROM {st.table_name} WHERE id = ?", (int(app_id),)
-        )
-        row = cursor.fetchone()
-
-        if row:
-            return dict(row)
-
+    for st in target_storage_obj.get_storage_create("web-apps"):
+        if st.storage_name not in st._schema_cache:
+            continue
+        with st.get_connection() as conn:
+            cursor = conn.execute(
+                f"SELECT * FROM {st.table_name} WHERE id = ?", (int(app_id),)
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
     return None
 
 
 def get_apps(target_storage_obj):
-    """Collect apps across ALL targets."""
+    """Collect apps across all targets."""
     if not target_storage_obj:
         return []
     all_apps = []
-    for target_data in target_storage_obj.targets_storage.get():
-        apps_list = target_storage_obj.get_storage_create("web-apps", parent_id=target_data["id"])
-        if apps_list:
-            for wa in apps_list:
-                if wa:
-                    all_apps.extend(wa.get())
+    for st in target_storage_obj.get_storage_create("web-apps"):
+        if st:
+            all_apps.extend(st.get())
     return all_apps
 
 
 def get_uniq_apps(target_storage_obj) -> "list[dict]":
-    # Late import to avoid circular dependency
     from rcn_web.core.scope import check_domain_in_scope
 
     global _UNIQ_APPS_CACHE
@@ -160,18 +122,14 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     if not target_storage_obj:
         return []
 
-    # 1. Collect apps with their associated target objects across ALL targets
     apps_with_targets = []
-    for target_data in target_storage_obj.targets_storage.get():
+    mts = get_target_storage()
+    for target_data in mts.targets_storage.get():
         wa_storages = target_storage_obj.get_storage_create("web-apps", parent_id=target_data["id"])
-        if not wa_storages:
-            continue
-        wa = wa_storages[0] if wa_storages else None
-        if not wa:
-            continue
-        apps = wa.get()
-        for app in apps:
-            apps_with_targets.append((app, target_data))
+        for wa in wa_storages:
+            if wa:
+                for app in wa.get():
+                    apps_with_targets.append((app, target_data))
 
     if not apps_with_targets:
         return []
@@ -188,20 +146,16 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     ]
 
     for app, target in apps_with_targets:
-        # a. Validation against target-specific scope
         target_scope = target.config.get("scope") if hasattr(target, "config") else None
         if target_scope:
-            # Normalize wildcards for check_domain_in_scope
             wildcards = target_scope.get("wildcards", [])
             wildcards = [i.replace("*.", "").replace("*", "") for i in wildcards]
             normalized_scope = {"wildcards": wildcards, "urls": target_scope.get("urls", [])}
             if not check_domain_in_scope(app["site"], normalized_scope):
                 continue
-        # If no specific target scope, we fall back to global scope via is_in_scope
         elif not is_in_scope(app["site"]):
             continue
 
-        # b. Deduplication and data check
         chash_str = (
             str(app.get("content_length", ""))
             + str(app.get("port", ""))
@@ -212,7 +166,7 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         chash = int.from_bytes(
             hashlib.md5(chash_str.encode("utf-8")).digest(), "little"
         )
-        
+
         has_data = False
         if chash not in found_hashes:
             found_hashes.append(chash)
@@ -220,9 +174,8 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         else:
             for st_name in storage_mapping:
                 full_st_name = f"web-apps::{st_name}"
-                # Use the specific target to check for sub-storage data
-                st = target.get_storage_create(full_st_name, parent_id=app["id"])
-                if len(st) > 0:
+                st_list = mts.get_storage_create(full_st_name, parent_id=app["id"])
+                if st_list and any(s and len(s) > 0 for s in st_list):
                     has_data = True
                     break
 
@@ -236,34 +189,28 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         print(f"DEBUG: get_uniq_apps took {time.time() - t1:.4f}s for {len(found_apps)} apps")
 
     _UNIQ_APPS_CACHE[ts_id] = {"timestamp": time.time(), "data": found_apps}
-
     return found_apps
 
 
 def get_target_for_site(target_storage_obj, site):
-    # Late import
     from rcn_web.core.scope import check_domain_in_scope
 
-    if not hasattr(target_storage_obj, "targets"):
-        return target_storage_obj
-
-    for target in target_storage_obj.targets.values():
-        scope = target.config.get("scope")
+    mts = get_target_storage()
+    for target_data in mts.targets_storage.get():
+        scope = target_data.get("config", {}).get("scope") if isinstance(target_data.get("config"), dict) else None
         if not scope or not isinstance(scope, dict):
             continue
-
         wildcards = scope.get("wildcards", [])
         urls = scope.get("urls", [])
-
-        # Sanitize wildcards for check_domain_in_scope
         wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
-
         check_scope = {"wildcards": wildcards, "urls": urls}
         if check_domain_in_scope(site, check_scope):
-            return target
+            target_obj = mts.get_target_storage(target_data["name"])
+            return target_obj
 
-    if target_storage_obj.targets:
-        return list(target_storage_obj.targets.values())[0]
+    targets = mts.targets_storage.get()
+    if targets:
+        return mts.get_target_storage(targets[0]["name"])
     return None
 
 
@@ -273,84 +220,27 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     if not target_storage_obj:
         return []
 
-    if hasattr(target_storage_obj, "targets"):
-        target_groups = defaultdict(list)
-        for app_data in apps:
-            domain = app_data.get("input")
-            if not domain:
-                url = (
-                    app_data.get("url")
-                    or app_data.get("final_url")
-                    or app_data.get("location")
-                )
-                if url:
-                    domain = urlparse(url).hostname
-
-            if domain:
-                target = get_target_for_site(target_storage_obj, domain)
-                if target:
-                    target_groups[target].append(app_data)
-
-        all_added = []
-        for target, target_apps in target_groups.items():
-            all_added.extend(add_apps(target, target_apps))
-        return all_added
-
-    processed_apps = []
-
+    target_groups = defaultdict(list)
     for app_data in apps:
-        app_url = (
-            app_data.get("location") or app_data.get("final_url") or app_data["url"]
-        )
-        app_data["url"] = app_url
-        parsed = urlparse(app_data["url"])
-        site = parsed.netloc
-        if ":" in site:
-            s, p = site.split(":")
-            site = s.strip(".") + ":" + p
-        site = site.strip(".")
-
-        app_data["scheme"] = parsed.scheme
-        app_data["host"] = parsed.hostname
-
-        if "port" not in app_data:
-            app_data["port"] = (
-                parsed.port
-                if parsed.port
-                else (443 if parsed.scheme == "https" else 80)
+        domain = app_data.get("input")
+        if not domain:
+            url = (
+                app_data.get("url")
+                or app_data.get("final_url")
+                or app_data.get("location")
             )
+            if url:
+                domain = urlparse(url).hostname
 
-        app_data["site"] = site
-        if "timestamp" in app_data:
-            del app_data["timestamp"]
+        if domain:
+            target = get_target_for_site(target_storage_obj, domain)
+            if target:
+                target_groups[target].append(app_data)
 
-        tech = app_data.get("tech") or app_data.get("technologies")
-        if isinstance(tech, list):
-            app_data["technologies"] = ",".join(tech)
-        if app_data.get("input"):
-            app_data["input_domain"] = app_data.get("input")
-
-        required_keys = [
-            "title",
-            "method",
-            "tech",
-            "status_code",
-            "technologies",
-            "input_domain",
-            "port",
-            "site",
-            "host",
-            "url",
-            "scheme",
-        ]
-        app_data = {i: app_data.get(i) for i in required_keys}
-
-        processed_apps.append(app_data)
-
-    st = target_storage_obj.get_storage_create("web-apps")
-    added = st.add_many(processed_apps)
-
-    return added
+    all_added = []
+    for target, target_apps in target_groups.items():
+        all_added.extend(add_apps(target, target_apps))
+    return all_added
 
 
 def delete_app_by_site(target_storage_obj, site):
@@ -360,19 +250,13 @@ def delete_app_by_site(target_storage_obj, site):
     if not app:
         return
 
-    if hasattr(target_storage_obj, "targets"):
-        for t in target_storage_obj.targets.values():
-            if get_app_by_site(t, site):
-                delete_app_by_site(t, site)
-                return
-
-    st = target_storage_obj.get_storage_create("web-apps")
-    if st.storage_name not in st._schema_cache:
+    for st in target_storage_obj.get_storage_create("web-apps"):
+        if st.storage_name not in st._schema_cache:
+            continue
+        with st.get_connection() as conn:
+            conn.execute(f"DELETE FROM {st.table_name} WHERE id = ?", (app["id"],))
+            conn.commit()
         return
-
-    with st.get_connection() as conn:
-        conn.execute(f"DELETE FROM {st.table_name} WHERE id = ?", (app["id"],))
-        conn.commit()
 
 
 class RemoteFlowsAdapter(StorageMetaData):
@@ -404,7 +288,7 @@ class RemoteFlowsAdapter(StorageMetaData):
     @property
     def parent_id(self):
         try:
-            ts = get_root_storage()
+            ts = get_target_storage()
             if ts:
                 return ts.id
             return 1
@@ -414,7 +298,7 @@ class RemoteFlowsAdapter(StorageMetaData):
     @property
     def parent_container(self):
         try:
-            return get_root_storage()
+            return get_target_storage()
         except:
             return None
 
@@ -629,46 +513,8 @@ async def fetch_remote_flows(event, scheduled_md):
 def web_match_storage(match_str, target=None):
     if match_str == "flows":
         st = RemoteFlowsAdapter.get_instance()
-        return [{"storage": st, "parent": get_root_storage()}]
+        return [{"storage": st, "parent": get_target_storage()}]
 
-    # Handle target_context dict (used when expanding across targets)
-    if isinstance(target, dict) and "_storage_obj" in target:
-        current_storage = target["_storage_obj"]
-        target_id = target.get("id")
-    else:
-        current_storage = target if target else get_root_storage()
-        target_id = None
-
-    # Priority 1: Direct resolution for hierarchical names that exist as actual tables.
-    # This avoids over-expansion when a specific collection is requested.
-    if (
-        hasattr(current_storage, "schema_cache")
-        and match_str in current_storage.schema_cache
-    ):
-        try:
-            parent_id = target_id if target_id else None
-            st_list = current_storage.get_storage_create(match_str, parent_id=parent_id)
-            # Flatten list returns so each item is a single storage
-            if isinstance(st_list, list):
-                return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
-            return [{"storage": st_list, "parent": current_storage}]
-        except:
-            pass
-    
-    if target is None:
-        # Expand across all targets
-        found_storages = []
-        for td in current_storage.targets_storage.get():
-            # Create a wrapper that acts as a single target context
-            target_context = {
-                "id": td["id"],
-                "name": td["name"],
-                "_storage_obj": current_storage,
-            }
-            found_storages.extend(web_match_storage(match_str, target=target_context))
-        if found_storages:
-            return found_storages
-    
     parts = match_str.split("::")
     is_annotations = parts[-1] == "annotations"
     if is_annotations:
@@ -679,16 +525,23 @@ def web_match_storage(match_str, target=None):
     sub_storage_name = "::".join(parts[1:])
 
     if container in ["web-apps", "all-web-apps", "apps"]:
+        # Collect apps across all targets
+        mts = get_target_storage()
+        if not mts:
+            return []
+        all_apps = []
+        for target_data in mts.targets_storage.get():
+            st_list = mts.get_storage_create("web-apps", parent_id=target_data["id"])
+            if st_list:
+                for wa in st_list:
+                    if wa:
+                        all_apps.extend(wa.get())
+
         if not sub_storage_name:
             if is_annotations:
-                if container == "web-apps":
-                    apps = get_uniq_apps(current_storage)
-                else:
-                    apps = get_apps(current_storage)
-
                 to_return = []
-                for app in apps:
-                    st_list = current_storage.get_storage_create(
+                for app in all_apps:
+                    st_list = mts.get_storage_create(
                         "web-apps", parent_id=app["id"]
                     )
                     st = st_list[0] if isinstance(st_list, list) and st_list else st_list
@@ -699,47 +552,29 @@ def web_match_storage(match_str, target=None):
                         "storage": st.annotations_storage,
                         "reference_storage": st,
                     }
-
                     to_return.append(item)
-
                 return to_return
 
-            st_list = current_storage.get_storage_create("web-apps", parent_id=target_id)
+            st_list = mts.get_storage_create("web-apps")
             if isinstance(st_list, list):
-                return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
-            return [{"storage": st_list, "parent": current_storage}]
-
-        # For hierarchical names, decide whether to expand by app or return the target-level storage
-        if container == "web-apps":
-            apps = get_uniq_apps(current_storage)
-        else:
-            apps = get_apps(current_storage)
-
-        # If no apps are found, or we are in a non-expansion context,
-        # we fall back to core matching (which will return the target-level storage).
-        if not apps:
-            return match_storage(match_str, current_storage)
+                return [{"storage": s, "parent": mts} for s in st_list if s is not None]
+            return [{"storage": st_list, "parent": mts}]
 
         to_return = []
-        for app in apps:
-            # When expanding, we maintain the full hierarchical name to ensure
-            # the storage can find its table, but scope it to the app's parent_id.
-            st_list = current_storage.get_storage_create(match_str, parent_id=app["id"])
+        for app in all_apps:
+            st_list = mts.get_storage_create(match_str, parent_id=app["id"])
             st = st_list[0] if isinstance(st_list, list) and st_list else st_list
             if not st:
                 continue
             item = {"parent": app, "storage": st}
-            if hasattr(current_storage, "name"):
-                item["target_name"] = current_storage.name
             if is_annotations:
                 item["storage"] = st.annotations_storage
                 item["reference_storage"] = st
-
             to_return.append(item)
         return to_return
 
-    # Fallback to core
-    return match_storage(match_str, current_storage)
+    # Fallback to core matching
+    return match_storage(match_str, target=target)
 
 
 async def mcp_server_user_interaction(prompt: str, msg_type: str = "ai-todo") -> dict:

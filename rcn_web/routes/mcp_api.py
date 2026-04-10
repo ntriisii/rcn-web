@@ -19,7 +19,7 @@ def _resolve_storage(
 def _resolve_storage_impl(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
-    from rcn_web.core.utils import get_root_storage, RemoteFlowsAdapter, web_match_storage
+    from rcn_web.core.utils import get_target_storage, RemoteFlowsAdapter, web_match_storage
 
     # Normalize parent_id
     pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
@@ -29,63 +29,21 @@ def _resolve_storage_impl(
         return RemoteFlowsAdapter.get_instance()
 
     # 2. Resolve target context
-    target_storage = get_root_storage()
-    if not target_storage:
+    mts = get_target_storage()
+    if not mts:
         return None
-
-    active_target = target_storage
-    is_target_match = False
-
-    if hasattr(target_storage, "targets") and target_storage.targets:
-        # Find the specific target if pid matches a Target ID
-        if pid:
-            pid_str = str(pid)
-            for tname, t in target_storage.targets.items():
-                if tname == "__multi_target__":
-                    continue
-                if str(t.id) == pid_str:
-                    active_target = t
-                    is_target_match = True
-                    break
-
-        # Default to first real target if no match or no pid
-        if not is_target_match:
-            for tname, t in target_storage.targets.items():
-                if tname != "__multi_target__":
-                    active_target = t
-                    break
 
     # 3. Handle hierarchical storages (e.g. web-apps::app-flows)
     if "::" in storage_name:
-        # If no pid provided, or pid was a Target ID, we want an unscoped global view
-        if pid is None or is_target_match:
-            try:
-                st = active_target.get_storage_create(storage_name)
-                # Disable the parent_id filter so we see data across all sub-entities
-                st._parent_id = None
-                if "length" in st.__dict__:
-                    del st.__dict__["length"]
-                return st
-            except Exception:
-                pass
-
-        # If pid is provided and wasn't a Target ID, it's likely a sub-entity ID (e.g. App ID)
         if pid:
             try:
-                return active_target.get_storage_create(storage_name, parent_id=int(pid))
+                return mts.get_storage_create(storage_name, parent_id=int(pid))
             except (ValueError, TypeError):
-                return active_target.get_storage_create(storage_name, parent_id=pid)
+                return mts.get_storage_create(storage_name, parent_id=pid)
+        return mts.get_storage_create(storage_name)
 
-    # 4. Handle top-level collections (e.g. web-apps)
-    # If pid was a Target ID, use it. If not, don't use it for web-apps (it might be an app ID)
-    if storage_name in ["web-apps", "all-web-apps", "apps"]:
-        if is_target_match:
-            return active_target.get_storage_create(storage_name, parent_id=pid)
-        else:
-            return active_target.get_storage_create(storage_name)
-
-    # 5. Top-level resolution fallback
-    return active_target.get_storage_create(storage_name, parent_id=pid)
+    # 4. Top-level resolution
+    return mts.get_storage_create(storage_name)
 
 
 
@@ -103,14 +61,14 @@ def test_resolve():
 @router.post("/describe-target")
 async def describe_target(req: Request):
     """Describe target and return storage preview information."""
-    from rcn_web.core.utils import get_root_storage
+    from rcn_web.core.utils import get_target_storage
     try:
         payload = await req.json()
     except Exception:
         payload = {}
 
     # Use core utility to get storage
-    target_storage = get_root_storage()
+    target_storage = get_target_storage()
     if not target_storage:
         return JSONResponse({"error": "No target storage found"}, status_code=404)
 

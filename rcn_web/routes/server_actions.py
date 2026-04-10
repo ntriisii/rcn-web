@@ -1,6 +1,6 @@
 from typing import Optional, Any
 from rcn_core.mcp import register_action
-from rcn_web.core.utils import get_storage, get_root_storage, get_app_by_site
+from rcn_web.core.utils import get_storage, get_target_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create, add_annotation
 from rcn_core.log import rlog
 
@@ -18,8 +18,7 @@ async def add_note(
     """
     Adds a note to an entry.
     """
-    # Logic similar to storage/addEntryNote route but direct
-    app = get_app_by_site(get_root_storage(), app_name)
+    app = get_app_by_site(get_target_storage(), app_name)
     if not app:
         raise ValueError(f"Application '{app_name}' not found.")
 
@@ -29,23 +28,11 @@ async def add_note(
 
     # Resolve storage
     try:
-        # Find the target storage this app belongs to
-        target_id = app.get("parent_id")
-        ts = get_root_storage()
-        parent_target = None
-        if hasattr(ts, "targets"):
-            for t in ts.targets.values():
-                if t.id == target_id:
-                    parent_target = t
-                    break
-        if not parent_target and hasattr(ts, "id") and ts.id == target_id:
-            parent_target = ts
-
         if st_name == "web-apps":
-            st = (parent_target or get_root_storage()).get_storage_create(st_name)
+            st = get_target_storage().get_storage_create(st_name)
         else:
             st = get_storage_create(
-                st_name, parent_id=app["id"], parent_obj=parent_target
+                st_name, parent_id=app["id"]
             )
     except Exception as e:
         raise ValueError(f"Storage '{st_name}' not found or error accessing it: {e}")
