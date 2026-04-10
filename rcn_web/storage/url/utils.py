@@ -19,33 +19,58 @@ from mitmproxy.http import Headers
 
 import rcn_core.globals
 
-from rcn_web.core.utils import get_storage, get_target_storage, get_app_by_site, get_app_by_id, add_apps
+from rcn_web.core.utils import (
+    get_storage,
+    get_target_storage,
+    get_app_by_site,
+    get_app_by_id,
+    add_apps,
+)
 from rcn_core.storage.bases import get_storage_create
 from rcn_core.log import rlog
 from pentest_utils.utils import id_hash
 
 
 static_ext = (
-    "css", "png", "jpg", "jpeg", "svg", "ico", "webp", "scss", "tif", "tiff",
-    "ttf", "otf", "woff", "woff2", "gif", "pdf", "bmp", "eot", "mp3", "mp4", "avi",
+    "css",
+    "png",
+    "jpg",
+    "jpeg",
+    "svg",
+    "ico",
+    "webp",
+    "scss",
+    "tif",
+    "tiff",
+    "ttf",
+    "otf",
+    "woff",
+    "woff2",
+    "gif",
+    "pdf",
+    "bmp",
+    "eot",
+    "mp3",
+    "mp4",
+    "avi",
 )
 interesting_ext = ("js", "xml", "json")
 
 
 def http_raw_request_to_flow(base_url: str, raw_http_content: str):
     """transforms Org raw request to HTTP flow"""
-    
+
     flow = dict()
     head_content = raw_http_content.split("\n\n", 1)
     body_content = ""
-    
+
     if len(head_content) >= 2:
         body_content = head_content[1]
 
     head_content = head_content[0].strip()
     body_content = body_content.strip()
     hlines = head_content.splitlines()
-    
+
     metadata = {}
     for i in hlines[1:]:
         if not i.strip().startswith("#"):
@@ -56,11 +81,11 @@ def http_raw_request_to_flow(base_url: str, raw_http_content: str):
         md_key = i[md_key.start() + 1 : md_key.end() - 1]
         md_value = i.split(":", 2)[2].strip()
         metadata[md_key] = md_value
-    
+
     body_content = "\r\n".join(
         [i for i in body_content.splitlines() if not i.strip().startswith("#")]
     )
-    
+
     body_content = body_content.strip("\r\n")
     mline = hlines[0]
     hlines = [i for i in hlines if not i.strip().startswith("#")]
@@ -107,18 +132,18 @@ class InvalidHTTPContent(Exception):
 
 def form_to_request(form, base_url, headers):
     """Returns form as a request URL"""
-    
+
     method = (form.get("method", "GET")).upper()
     url = urljoin(form.get("action", ""), base_url)
     ctype = form.get("enctype", "unknown")
     params = form.get("parameters", [])
     data = ""
-    
+
     if method == "GET":
         url += "?" + "&".join(i + "=FUZZ" for i in params)
     else:
         data = "&".join(i + "=FUZZ" for i in params)
-    
+
     p = urlparse(url)
     path = p.path + ("" if not p.query else "?" + p.query)
     raw_headers = "\n".join(str(i[0]) + ": " + str(i[1]) for i in headers.items())
@@ -130,7 +155,7 @@ def form_to_request(form, base_url, headers):
         + "\n\n"
         + data
     )
-    
+
     return {
         "url": url,
         "method": method,
@@ -185,16 +210,24 @@ async def handle_collected_urls(extractor, content):
 
     for site in found_sites_data:
         app = get_app_by_site(st, site)
-        
+
         if not app:
-             add_apps(st, [{'url': f'https://{site}', 'title': 'Discovered by URL Collection'}])
-             app = get_app_by_site(st, site)
-        
+            add_apps(
+                st,
+                [{"url": f"https://{site}", "title": "Discovered by URL Collection"}],
+            )
+            app = get_app_by_site(st, site)
+
         if not app:
             continue
 
         d = found_sites_data[site]
-        url_storage = get_storage_create("web-apps::app-links", parent_id=app['id'])
+        url_storage_list = get_storage_create(
+            "web-apps::app-links", parent_id=app["id"]
+        )
+        if not url_storage_list:
+            continue
+        url_storage = url_storage_list[0]
 
         for entry in d:
             p = urlparse(entry["url"])
@@ -268,13 +301,18 @@ async def add_gau_entries(all_entries):
         for site in found_sites:
             app = get_app_by_site(st, site)
             if not app:
-                 add_apps(st, [{'url': f'https://{site}', 'title': 'Discovered by GAU'}])
-                 app = get_app_by_site(st, site)
-            
+                add_apps(st, [{"url": f"https://{site}", "title": "Discovered by GAU"}])
+                app = get_app_by_site(st, site)
+
             if not app:
                 continue
 
-            wayback_storage = get_storage_create("web-apps::wayback-urls", parent_id=app['id'])
+            wayback_storage_list = get_storage_create(
+                "web-apps::wayback-urls", parent_id=app["id"]
+            )
+            if not wayback_storage_list:
+                continue
+            wayback_storage = wayback_storage_list[0]
             wayback_storage.storage_md_set("wayback-fetched-all", True)
             wayback_storage.add_many(found_sites[site], source="waybackurls")
 
@@ -325,11 +363,11 @@ async def request_gau_urls(event, scheduled_md, matched_storages=[]):
             break
         else:
             files_counter += 1
-    
+
     rlog("requesting gau entries on URLs", len(urls))
-    
+
     ses = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False))
-    
+
     for u in urls:
         tasks = []
         if len(tasks) < concurrent_requests:
