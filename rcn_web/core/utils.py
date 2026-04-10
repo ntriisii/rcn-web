@@ -130,7 +130,10 @@ def get_app_by_site(target_storage_obj, app_site: str):
                 return app
         return None
 
-    st = target_storage_obj.get_storage_create("web-apps")
+    st_list = target_storage_obj.get_storage_create("web-apps")
+    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+    if not st:
+        return None
 
     if st.storage_name not in st._schema_cache:
         return None
@@ -162,7 +165,10 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
                 return app
         return None
 
-    st = target_storage_obj.get_storage_create("web-apps")
+    st_list = target_storage_obj.get_storage_create("web-apps")
+    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+    if not st:
+        return None
     if st.storage_name not in st._schema_cache:
         return None
 
@@ -189,7 +195,10 @@ def get_apps(target_storage_obj):
             all_apps.extend(get_apps(t))
         return all_apps
 
-    apps = target_storage_obj.get_storage_create("web-apps")
+    apps_list = target_storage_obj.get_storage_create("web-apps")
+    apps = apps_list[0] if isinstance(apps_list, list) and apps_list else apps_list
+    if not apps:
+        return []
     return apps.get()
 
 
@@ -216,11 +225,21 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
         for tname, t in target_storage_obj.targets.items():
             if tname == "__multi_target__":
                 continue
-            apps = t.get_storage_create("web-apps").get()
+            wa_storages = t.get_storage_create("web-apps")
+            if isinstance(wa_storages, list):
+                wa_storages = wa_storages[0] if wa_storages else None
+            if not wa_storages:
+                continue
+            apps = wa_storages.get()
             for app in apps:
                 apps_with_targets.append((app, t))
     else:
-        apps = target_storage_obj.get_storage_create("web-apps").get()
+        wa_storages = target_storage_obj.get_storage_create("web-apps")
+        if isinstance(wa_storages, list):
+            wa_storages = wa_storages[0] if wa_storages else None
+        if not wa_storages:
+            return []
+        apps = wa_storages.get()
         for app in apps:
             apps_with_targets.append((app, target_storage_obj))
 
@@ -691,8 +710,11 @@ def web_match_storage(match_str, target=None):
         and match_str in current_storage.schema_cache
     ):
         try:
-            st = current_storage.get_storage_create(match_str)
-            return [{"storage": st, "parent": current_storage}]
+            st_list = current_storage.get_storage_create(match_str)
+            # Flatten list returns so each item is a single storage
+            if isinstance(st_list, list):
+                return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
+            return [{"storage": st_list, "parent": current_storage}]
         except:
             pass
     
@@ -735,9 +757,12 @@ def web_match_storage(match_str, target=None):
 
                 to_return = []
                 for app in apps:
-                    st = current_storage.get_storage_create(
+                    st_list = current_storage.get_storage_create(
                         "web-apps", parent_id=app["id"]
                     )
+                    st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+                    if not st:
+                        continue
                     item = {
                         "parent": app,
                         "storage": st.annotations_storage,
@@ -748,8 +773,10 @@ def web_match_storage(match_str, target=None):
 
                 return to_return
 
-            st = current_storage.get_storage_create("web-apps")
-            return [{"storage": st, "parent": current_storage}]
+            st_list = current_storage.get_storage_create("web-apps")
+            if isinstance(st_list, list):
+                return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
+            return [{"storage": st_list, "parent": current_storage}]
 
         # For hierarchical names, decide whether to expand by app or return the target-level storage
         if container == "web-apps":
@@ -766,7 +793,10 @@ def web_match_storage(match_str, target=None):
         for app in apps:
             # When expanding, we maintain the full hierarchical name to ensure
             # the storage can find its table, but scope it to the app's parent_id.
-            st = current_storage.get_storage_create(match_str, parent_id=app["id"])
+            st_list = current_storage.get_storage_create(match_str, parent_id=app["id"])
+            st = st_list[0] if isinstance(st_list, list) and st_list else st_list
+            if not st:
+                continue
             item = {"parent": app, "storage": st}
             if hasattr(current_storage, "name"):
                 item["target_name"] = current_storage.name
