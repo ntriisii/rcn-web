@@ -66,9 +66,8 @@ from rcn_core.decorators import rcn_event
 @rcn_event()
 async def handle_unprocessed_domains(event, scheduled_md):
     scanner_name = event["name"]
-    target = event.get("target")
     
-    async with get_unprocessed_entries(scanner_name, event, target=target, match_storage_fn=web_match_storage) as unscanned:
+    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unscanned:
         new_subdomains = [i["entry"]["domain"] for i in unscanned.values()]
         if new_subdomains:
             flow = rcn_core.globals.RCN_FLOWS.get("subdomains-flow")

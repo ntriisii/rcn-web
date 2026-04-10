@@ -10,48 +10,28 @@ from rcn_web.core.utils import web_match_storage, get_target_storage, get_target
 from rcn_core.decorators import rcn_event
 
 
-def _get_first_target_config():
-    """Get the config for the first target from YAML."""
-    mts = get_target_storage()
-    if not mts:
-        return {}
-    targets = mts.targets_storage.get()
-    if not targets:
-        return {}
-    return get_target_config(targets[0]["name"])
-
 
 @rcn_event()
 async def handle_init_target(event, scheduled_md):
     event_ctx = event.copy()
     event_ctx["require-storage"] = "targets"
-    event_ctx["max-entries"] = 1
+    event_ctx["min-entries"] = 1
+    mts = get_target_storage()
+    
     async with get_unprocessed_entries("init-recon", event_ctx, target=None, match_storage_fn=web_match_storage) as entries:
-        target = get_target_storage()
-        if target.storage_md_get("init-recon-finished"):
-            return
-        if target.storage_md_get("init-recon-running"):
-            return
-
-        flow_fn = RCN_FLOWS.get("init-flow")
-        if not flow_fn:
-            return
-
-        flow = flow_fn()
-
-        # Use web scope helpers
-        cfg = _get_first_target_config()
-        wildcards = get_config_wildcards(cfg)
-        urls = get_config_urls(cfg)
-
-        flow.set_data(wildcards)
-
-        target.storage_md_set("init-recon-running", True)
-        target.storage_md_set(
-            "init-recon-started-time", datetime.datetime.now().timestamp()
-        )
-
-        try:
+        for target_obj in entries.values():
+            target = target_obj['entry']
+            flow_fn = RCN_FLOWS.get("init-flow")
+            if not flow_fn: return
+            
+            flow = flow_fn()
+            
+            # Use web scope helpers
+            cfg = get_target_config(target["name"])
+            wildcards = get_config_wildcards(cfg)
+            urls = get_config_urls(cfg)
+            
+            flow.set_data(wildcards)
             out = await flow.run()
 
             out = [i.replace("..", ".").strip(".") for i in out]
@@ -60,29 +40,17 @@ async def handle_init_target(event, scheduled_md):
 
             out = uniq(out)
 
-            with open(target.target_directory / "domains.txt", "a+") as f:
-                for d in out:
-                    f.write(d + "\n")
+            with open(mts.target_directory / f"{target['name']}_domains.txt", "a+") as f:
+                for d in out: f.write(d + "\n")
 
             all_inscope = wildcards + urls
             filtered_out = []
             for domain in out:
                 if any(i in domain for i in all_inscope):
                     filtered_out.append(domain)
+                    
             out = filtered_out
 
-            target.storage_md_set("init-recon-finished", True)
-            target.storage_md_set("init-recon-running", False)
-
-            target_md = storage_automation_md_get_create(
-                target, "check-for-new-domains"
-            )
-
-            target_md["last-check-time"] = datetime.datetime.now().timestamp()
-            get_storage_create("domains", parent_id=target.id).add_many(
-                [{"domain": i} for i in out], source="init-domains"
-            )
-
-        except Exception as e:
-            target.storage_md_set("init-recon-running", False)
-            raise e
+            domain_st = get_storage_create("domains", parent_id=target["id"])[0]
+            domain_st.add_many([{"domain": i} for i in out], source="init-domains")
+            

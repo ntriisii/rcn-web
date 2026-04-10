@@ -131,7 +131,9 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     apps_with_targets = []
     mts = get_target_storage()
     for target_data in mts.targets_storage.get():
-        wa_storages = target_storage_obj.get_storage_create("web-apps", parent_id=target_data["id"])
+        wa_storages = target_storage_obj.get_storage_create(
+            "web-apps", parent_id=target_data["id"]
+        )
         for wa in wa_storages:
             if wa:
                 for app in wa.get():
@@ -152,13 +154,20 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     ]
 
     for app, target in apps_with_targets:
-        target_name = target.get("name") if isinstance(target, dict) else getattr(target, "name", None)
+        target_name = (
+            target.get("name")
+            if isinstance(target, dict)
+            else getattr(target, "name", None)
+        )
         target_cfg = get_target_config(target_name) if target_name else {}
         target_scope = target_cfg.get("scope")
         if target_scope:
             wildcards = target_scope.get("wildcards", [])
             wildcards = [i.replace("*.", "").replace("*", "") for i in wildcards]
-            normalized_scope = {"wildcards": wildcards, "urls": target_scope.get("urls", [])}
+            normalized_scope = {
+                "wildcards": wildcards,
+                "urls": target_scope.get("urls", []),
+            }
             if not check_domain_in_scope(app["site"], normalized_scope):
                 continue
         elif not is_in_scope(app["site"]):
@@ -194,7 +203,9 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     found_apps = sorted(found_apps, key=lambda x: x.get("timestamp", 0.0))
 
     if time.time() - t1 > 0.1:
-        print(f"DEBUG: get_uniq_apps took {time.time() - t1:.4f}s for {len(found_apps)} apps")
+        print(
+            f"DEBUG: get_uniq_apps took {time.time() - t1:.4f}s for {len(found_apps)} apps"
+        )
 
     _UNIQ_APPS_CACHE[ts_id] = {"timestamp": time.time(), "data": found_apps}
     return found_apps
@@ -205,7 +216,8 @@ def get_target_for_site(target_storage_obj, site):
 
     mts = get_target_storage()
     for target_data in mts.targets_storage.get():
-        scope = target_data.get("config", {}).get("scope") if isinstance(target_data.get("config"), dict) else None
+        config = target_data.get("config")
+        scope = config.get("scope") if isinstance(config, dict) else None
         if not scope or not isinstance(scope, dict):
             continue
         wildcards = scope.get("wildcards", [])
@@ -213,8 +225,7 @@ def get_target_for_site(target_storage_obj, site):
         wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
         check_scope = {"wildcards": wildcards, "urls": urls}
         if check_domain_in_scope(site, check_scope):
-            target_obj = mts.get_target_storage(target_data["name"])
-            return target_obj
+            return mts.get_target_storage(target_data["name"])
 
     targets = mts.targets_storage.get()
     if targets:
@@ -225,9 +236,41 @@ def get_target_for_site(target_storage_obj, site):
 def add_apps(target_storage_obj, apps: "list[dict]"):
     if not apps:
         return []
-    if not target_storage_obj:
-        return []
 
+    from rcn_web.core.scope import check_domain_in_scope
+
+    mts = get_target_storage()
+
+    # 1. Bulk collect targets and their scopes
+    targets_data = mts.targets_storage.get()
+    targets_info = []
+    for target_data in targets_data:
+        config = target_data.get("config")
+        if not isinstance(config, dict):
+            continue
+        scope = config.get("scope")
+        if not isinstance(scope, dict):
+            continue
+
+        wildcards = [
+            i.replace("*.", ".").replace("*", "") for i in scope.get("wildcards", [])
+        ]
+        check_scope = {"wildcards": wildcards, "urls": scope.get("urls", [])}
+
+        targets_info.append(
+            {
+                "check_scope": check_scope,
+                "target_obj": mts.get_target_storage(target_data["name"]),
+            }
+        )
+
+    default_target = None
+    if targets_info:
+        default_target = targets_info[0]["target_obj"]
+    elif targets_data:
+        default_target = mts.get_target_storage(targets_data[0]["name"])
+
+    # 2. Group apps by target
     target_groups = defaultdict(list)
     for app_data in apps:
         domain = app_data.get("input")
@@ -240,14 +283,56 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
             if url:
                 domain = urlparse(url).hostname
 
+        target = None
         if domain:
-            target = get_target_for_site(target_storage_obj, domain)
-            if target:
-                target_groups[target].append(app_data)
+            for t_info in targets_info:
+                if check_domain_in_scope(domain, t_info["check_scope"]):
+                    target = t_info["target_obj"]
+                    break
 
+        if not target:
+            target = default_target
+
+        if target:
+            target_groups[target].append(app_data)
+
+    # 3. Add apps for each target
     all_added = []
     for target, target_apps in target_groups.items():
-        all_added.extend(add_apps(target, target_apps))
+        st_list = target.get_storage_create("web-apps")
+        if not st_list:
+            continue
+
+        for st in st_list:
+            if st.storage_name not in st._schema_cache:
+                continue
+
+            # Deduplicate against existing apps in this target
+            existing_sites = set()
+            with st.get_connection() as conn:
+                cursor = conn.execute(f"SELECT site FROM {st.table_name}")
+                existing_sites = {row[0] for row in cursor.fetchall()}
+
+            to_add = []
+            for app in target_apps:
+                site = app.get("site")
+                if not site:
+                    url = app.get("url") or app.get("final_url") or app.get("location")
+                    if url:
+                        site = urlparse(url).netloc
+
+                if site and site not in existing_sites:
+                    app["site"] = site
+                    to_add.append(app)
+                    existing_sites.add(site)
+
+            if to_add:
+                added = st.add_many(to_add)
+                if added:
+                    all_added.extend(added)
+                else:
+                    all_added.extend(to_add)
+
     return all_added
 
 
@@ -549,9 +634,7 @@ def web_match_storage(match_str, target=None):
             if is_annotations:
                 to_return = []
                 for app in all_apps:
-                    st_list = mts.get_storage_create(
-                        "web-apps", parent_id=app["id"]
-                    )
+                    st_list = mts.get_storage_create("web-apps", parent_id=app["id"])
                     st = st_list[0] if st_list else None
                     if not st:
                         continue
