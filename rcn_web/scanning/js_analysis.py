@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 from rcn_core.data_access import (
     get_storage,
     get_unprocessed_entries,
-    get_storage_create,
 )
+from rcn_core.storage.bases import get_storage_create
 from rcn_web.core.utils import (
     web_match_storage,
     is_in_scope,

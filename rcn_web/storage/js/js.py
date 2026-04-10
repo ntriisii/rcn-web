@@ -6,7 +6,7 @@ import aiofiles as aiof
 
 from urllib.parse import urlparse
 
-from rcn_web.core.utils import get_storage
+from rcn_web.core.utils import get_root_storage
 from rcn_core.storage.bases import get_storage_create
 import rcn_core.globals
 
@@ -57,7 +57,7 @@ async def js_analysis_run_flow_on_files(paths, app_name):
     flow.set_data([collected_paths])
     out = await flow.run()
 
-    st = get_storage()
+    st = get_root_storage()
 
     # NOTE: the app would be already created from the caller function
     app = get_app_by_site(st, app_name)

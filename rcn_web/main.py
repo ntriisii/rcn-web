@@ -38,7 +38,7 @@ import rcn_core.mcp.core_actions
 
 from rcn_core.time_event import TimeEvent
 from rcn_core.globals import DUMP_TIMER
-from rcn_core.storage.target_storage import TargetStorage
+from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
 from rcn_core.storage.bases import get_storage_create, add_annotation
 from rcn_core.log import rlog
 from rcn_web.viewers.emacs.target import elisp_view_target_apps
@@ -58,6 +58,7 @@ from rcn_web.core.scope import get_target_scope
 from rcn_web.core.utils import (
     web_match_storage,
     get_storage,
+    get_root_storage,
     get_uniq_apps,
     get_app_by_site,
     get_app_by_id,
@@ -214,7 +215,7 @@ async def shutdown_event():
 
 @app.get("/forceDumpData")
 async def force_dump_data() -> JSONResponse:
-    await get_storage().dump_data(force=True)
+    await get_root_storage().dump_data(force=True)
     return JSONResponse("success")
 
 
@@ -261,7 +262,7 @@ def getsize(obj_0):
 
 @app.get("/getApp")
 async def get_app_data(app_id):
-    app = get_app_by_id(get_storage(), app_id)
+    app = get_app_by_id(get_root_storage(), app_id)
     if not app:
         return JSONResponse({"error": "app not found"}, status_code=404)
 
@@ -277,7 +278,7 @@ async def get_app_more_data(req: Request):
     include_all_data = data["include-all-data"]
     found_apps = []
     for i in ids:
-        app = get_app_by_id(get_storage(), i)
+        app = get_app_by_id(get_root_storage(), i)
         if not app:
             continue
         if not include_all_data:
@@ -383,7 +384,7 @@ async def get_app(content: Request):
         data = arrange_dorks_view()
     elif storage_name == "web-apps":
         data = elisp_view_target_apps(
-            get_storage(),
+            get_root_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -395,7 +396,7 @@ async def get_app(content: Request):
 
     elif storage_name == "app-with-links":
         data = elisp_view_target_apps_with_links(
-            get_storage(),
+            get_root_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -434,7 +435,7 @@ async def get_app(content: Request):
         #   get_storage().get_storage_create('shodan-internetdb-ips').add_many(d, source=)
 
         data = view_ip_data(
-            get_storage(),
+            get_root_storage(),
             match_groups=match_groups,
             create_windows=create_windows,
             first_id=first_id,
@@ -448,9 +449,9 @@ async def get_app(content: Request):
     elif app_id or app_name:
         app = None
         if app_id:
-            app = get_app_by_id(get_storage(), app_id)
+            app = get_app_by_id(get_root_storage(), app_id)
         if not app and app_name:
-            app = get_app_by_site(get_storage(), app_name)
+            app = get_app_by_site(get_root_storage(), app_name)
 
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
@@ -488,7 +489,7 @@ async def get_data_view(entry, data_storage="app"):
     data = dict()
 
     if data_storage == "app":
-        app = get_app_by_id(get_storage(), entry)
+        app = get_app_by_id(get_root_storage(), entry)
         if not app:
             return JSONResponse({"error": "app not found"}, status_code=404)
         data = elisp_make_app_view_data(app)
@@ -522,7 +523,7 @@ async def get_entry_by_id(
     entry_id: int, storage_name: str, app_name: "Optional[str]" = None
 ):
     if not app_name:
-        st = get_storage()[storage_name]
+        st = get_root_storage()[storage_name]
         if not st:
             return JSONResponse("target storage not found", status_code=404)
         data = [i for i in st.get() if i["id"] == entry_id]
@@ -534,9 +535,9 @@ async def get_entry_by_id(
 
     app = None
     if app_name:
-        app = get_app_by_id(get_storage(), app_name)
+        app = get_app_by_id(get_root_storage(), app_name)
     if not app and app_name:
-        app = get_app_by_site(get_storage(), app_name)
+        app = get_app_by_site(get_root_storage(), app_name)
 
     if not app:
         return JSONResponse({"error": "app not found"}, status_code=404)
@@ -573,7 +574,7 @@ async def sync_proxy():
 @app.get("/getAllAnnotations")
 async def get_all_annotations():
     all_annotations = []
-    target = get_storage()
+    target = get_root_storage()
 
     # 1. Fetch annotations from relevant target-level storages
     target_storages = [
@@ -638,6 +639,6 @@ async def get_all_annotations():
 
 @app.get("debug")
 def debug_scanners():
-    scheduled_storage = get_storage().get_storage_create("scheduled").get()
+    scheduled_storage = get_root_storage().get_storage_create("scheduled").get()
 
     return JSONResponse(scheduled_storage)

@@ -204,3 +204,89 @@ async def test_handle_init_target_error_path():
         assert mock_target._storage_md.get("init-recon-running") is False
         # Verify finished flag was NOT set
         assert mock_target._storage_md.get("init-recon-finished") is None
+
+
+# --- Tests for real dict entry resolution (new API behavior) ---
+
+
+@pytest.mark.asyncio
+async def test_handle_init_target_plain_dict_entry():
+    """Test that plain dict entries from targets table are resolved to TargetStorage."""
+    # Simulate real behavior: entry is a plain dict from the targets table
+    mock_dict_entry = {"id": 42, "name": "test-target"}
+    mock_flow = MockFlow(return_value=["sub.example.com"])
+
+    # Mock TargetStorage that gets resolved from the dict entry
+    mock_target_obj = MagicMock()
+    mock_target_obj.id = 42
+    mock_target_obj.name = "test-target"
+    mock_target_obj.target_directory = Path("/tmp/mock_target")
+    mock_target_obj.config = {
+        "scope": {"wildcards": ["*.example.com"], "urls": ["https://example.com"]}
+    }
+    mock_target_obj._storage_md = {}
+
+    def mock_storage_md_get(key):
+        return mock_target_obj._storage_md.get(key)
+
+    def mock_storage_md_set(key, value):
+        mock_target_obj._storage_md[key] = value
+
+    mock_target_obj.storage_md_get = mock_storage_md_get
+    mock_target_obj.storage_md_set = mock_storage_md_set
+
+    # Mock MultiTargetStorage as parent
+    mock_parent = MagicMock()
+    mock_parent.get_target_storage.return_value = mock_target_obj
+
+    mock_entries = {"entry-1": {"entry": mock_dict_entry, "parent": mock_parent}}
+
+    mock_context = MagicMock()
+    mock_context.__aenter__ = AsyncMock(return_value=mock_entries)
+    mock_context.__aexit__ = AsyncMock(return_value=None)
+
+    mock_domains_storage = MagicMock()
+    mock_domains_storage.add_many = MagicMock()
+
+    with (
+        patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context),
+        patch("rcn_web.core.events.RCN_FLOWS", {"init-flow": lambda: mock_flow}),
+        patch(
+            "rcn_web.core.events.get_config_wildcards", return_value=["*.example.com"]
+        ),
+        patch(
+            "rcn_web.core.events.get_config_urls", return_value=["https://example.com"]
+        ),
+        patch(
+            "rcn_web.core.events.get_storage_create", return_value=mock_domains_storage
+        ),
+        patch("rcn_web.core.events.storage_automation_md_get_create", return_value={}),
+        patch("builtins.open", mock_open()) as mock_file_open,
+        patch("rcn_web.core.events.uniq", side_effect=lambda x: list(dict.fromkeys(x))),
+        patch("rcn_web.core.events.datetime") as mock_datetime,
+    ):
+        mock_datetime.datetime.now.return_value.timestamp.return_value = 1234567890.0
+
+        await handle_init_target({"event": "test"}, {"run_id": "test-run"})
+
+        # Verify the target was resolved via parent
+        mock_parent.get_target_storage.assert_called_once_with("test-target")
+        # Verify flags set on the resolved TargetStorage
+        assert mock_target_obj._storage_md.get("init-recon-finished") is True
+        assert mock_target_obj._storage_md.get("init-recon-running") is False
+
+
+@pytest.mark.asyncio
+async def test_handle_init_target_plain_dict_no_parent():
+    """Test handler skips when parent is not available to resolve dict entry."""
+    mock_dict_entry = {"id": 42, "name": "test-target"}
+    # No parent key — can't resolve to TargetStorage
+    mock_entries = {"entry-1": {"entry": mock_dict_entry}}
+
+    mock_context = MagicMock()
+    mock_context.__aenter__ = AsyncMock(return_value=mock_entries)
+    mock_context.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("rcn_web.core.events.get_unprocessed_entries", return_value=mock_context):
+        # Should skip gracefully without error
+        await handle_init_target({"event": "test"}, {"run_id": "test-run"})

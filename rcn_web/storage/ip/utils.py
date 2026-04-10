@@ -7,7 +7,7 @@ import ipaddress
 
 from bs4 import BeautifulSoup as soup
 
-from rcn_web.core.utils import get_storage
+from rcn_web.core.utils import get_storage, get_root_storage
 from rcn_core.utils import time_str_to_secs
 from rcn_core.log import rlog
 
@@ -171,7 +171,7 @@ def add_found_ips(entries):
 
 
 def handle_shodan_io_content(content):
-    st = get_storage()
+    st = get_root_storage()
     shodan_storage = st.get_storage_create("shodan-scrapped-ips")
     found_ips = st.get_storage_create("found-ips")
     subdomains = st.get_storage_create("domains")
@@ -200,7 +200,7 @@ def handle_shodan_io_content(content):
 
 
 async def scan_shodan_for_ips(event, scheduled_md, matched_storages=[]):
-    s = get_storage()
+    s = get_root_storage()
     debug = event.get("debug")
     ip_storage = s.get_storage_create("found-ips")
     repeat_checks_time = event.get("repeat-every", "1 day")

@@ -78,8 +78,13 @@ class ListStorage:
 import rcn_core.globals
 from rcn_core.decorators import rcn_event
 from rcn_core.log import rlog
-from rcn_core.storage.target_storage import TargetStorage
-from rcn_core.storage.bases import StorageMetaData, get_storage_create, add_annotation
+from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
+from rcn_core.storage.bases import (
+    StorageMetaData,
+    get_storage_create,
+    add_annotation,
+    get_target_storage,
+)
 from rcn_core.data_access import (
     get_storage,
     get_unprocessed_entries,
@@ -94,6 +99,14 @@ from rcn_core.data_access import (
 
 _UNIQ_APPS_CACHE = {}
 _UNIQ_APPS_CACHE_TTL = 30
+
+
+def get_root_storage():
+    """Return the MultiTargetStorage for the current target directory."""
+    ts = get_target_storage()
+    return ts
+
+
 # --- Scope Utilities (Moved from Core) ---
 
 
@@ -442,9 +455,7 @@ class RemoteFlowsAdapter(StorageMetaData):
     @property
     def parent_id(self):
         try:
-            from rcn_core.data_access import get_storage
-
-            ts = get_storage()
+            ts = get_root_storage()
             if ts:
                 return ts.id
             return 1
@@ -454,9 +465,7 @@ class RemoteFlowsAdapter(StorageMetaData):
     @property
     def parent_container(self):
         try:
-            from rcn_core.data_access import get_storage
-
-            return get_storage()
+            return get_root_storage()
         except:
             return None
 
@@ -671,9 +680,9 @@ async def fetch_remote_flows(event, scheduled_md):
 def web_match_storage(match_str, target=None):
     if match_str == "flows":
         st = RemoteFlowsAdapter.get_instance()
-        return [{"storage": st, "parent": get_storage()}]
-    
-    current_storage = target if target else get_storage()
+        return [{"storage": st, "parent": get_root_storage()}]
+
+    current_storage = target if target else get_root_storage()
 
     # Priority 1: Direct resolution for hierarchical names that exist as actual tables.
     # This avoids over-expansion when a specific collection is requested.
@@ -694,6 +703,18 @@ def web_match_storage(match_str, target=None):
                 continue
             found_storages.extend(web_match_storage(match_str, target=t))
         return found_storages
+
+    # If no target was passed and we got a single TargetStorage, also check
+    # whether we should expand across all targets
+    if target is None:
+        ts = get_target_storage()
+        if ts and hasattr(ts, "targets_storage"):
+            found_storages = []
+            for td in ts.targets_storage.get():
+                t = ts.get_target_storage(td["name"])
+                found_storages.extend(web_match_storage(match_str, target=t))
+            if found_storages:
+                return found_storages
     
     parts = match_str.split("::")
     is_annotations = parts[-1] == "annotations"

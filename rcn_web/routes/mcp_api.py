@@ -6,18 +6,7 @@ from fastapi import APIRouter
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
-# Force local rcn-core usage
-core_path = os.path.expanduser("~/programming-projects/python/rcn-core/")
-if core_path not in sys.path:
-    sys.path.insert(0, core_path)
-
-# Ensure latest core logic is used
-for mod_name in ["rcn_core.data_access", "rcn_core.mcp.api", "rcn_core.storage.bases"]:
-    if mod_name in sys.modules:
-        importlib.reload(sys.modules[mod_name])
-
 from rcn_core.mcp.api import create_mcp_router
-from rcn_web.core.utils import get_storage, web_match_storage
 
 
 def _resolve_storage(
@@ -30,16 +19,17 @@ def _resolve_storage(
 def _resolve_storage_impl(
     storage_name: str, parent_id: Optional[Union[int, str]] = None
 ) -> Any:
+    from rcn_web.core.utils import get_root_storage, RemoteFlowsAdapter, web_match_storage
+
     # Normalize parent_id
     pid = parent_id if parent_id and parent_id != 0 and parent_id != "0" else None
 
     # 1. Specialized flows handling
     if storage_name == "flows":
-        from rcn_web.core.utils import RemoteFlowsAdapter
         return RemoteFlowsAdapter.get_instance()
 
     # 2. Resolve target context
-    target_storage = get_storage()
+    target_storage = get_root_storage()
     if not target_storage:
         return None
 
@@ -113,13 +103,14 @@ def test_resolve():
 @router.post("/describe-target")
 async def describe_target(req: Request):
     """Describe target and return storage preview information."""
+    from rcn_web.core.utils import get_root_storage
     try:
         payload = await req.json()
     except Exception:
         payload = {}
 
     # Use core utility to get storage
-    target_storage = get_storage()
+    target_storage = get_root_storage()
     if not target_storage:
         return JSONResponse({"error": "No target storage found"}, status_code=404)
 

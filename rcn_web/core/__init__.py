@@ -139,8 +139,16 @@ async def proxy_snyc(event):
         return
 
     if RE_UPDATE_PROXY:
-        async with aiohttp.ClientSession() as sess:
-            data = get_proxy_data()
-            await sess.post(url="http://localhost:8082/updateRcn-ServerData", json=data)
-
-        RE_UPDATE_PROXY = False
+        try:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=5.0)
+            ) as sess:
+                data = get_proxy_data()
+                await sess.post(
+                    url="http://localhost:8082/updateRcn-ServerData", json=data
+                )
+            RE_UPDATE_PROXY = False
+        except aiohttp.ClientConnectorError:
+            pass
+        except Exception as e:
+            rlog(f"Error syncing proxy data: {e}", level="error")

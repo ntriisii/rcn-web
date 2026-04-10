@@ -4,7 +4,7 @@ import validators
 from collections import defaultdict
 from urllib.parse import urlparse
 
-from rcn_web.core.utils import get_storage, get_app_by_site
+from rcn_web.core.utils import get_root_storage, get_app_by_site
 from rcn_core.storage.bases import get_storage_create
 
 
@@ -51,7 +51,7 @@ async def handle_scanning_entries(content):
 
         found_apps[site].append(entry)
 
-    s = get_storage()
+    s = get_root_storage()
     for site in found_apps:
         app = get_app_by_site(s, site)
         data = found_apps[site]

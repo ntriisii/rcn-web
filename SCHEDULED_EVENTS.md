@@ -189,52 +189,140 @@ async def enrichment_handler(event, *args):
 ### G. Flow Delegation (Modular Execution)
 Heavy or complex logic is often abstracted into **Flows** (via `RCN_FLOWS`). An event handler acts as a thin orchestrator that retrieves data, instantiates a specific flow, and awaits its completion. This ensures modularity and easy testing of complex logic.
 
+### H. Periodic Maintenance (Clock-only)
+Tasks that perform system-wide maintenance, log rotation, or cache clearing. These do not require a specific storage to trigger.
+
 ---
 
-## 6. Advanced Implementation: Flow Delegation
+## 7. Advanced Implementation: Specialized Variations
 
-For tasks involving complex, multi-stage logic, handlers delegate work to specialized **Flow** objects. This pattern is essential for logic that requires its own state management or external resource handling.
+### Pattern: Periodic Maintenance (Clock-only)
+This pattern is used for tasks that run purely on a time interval without being tied to a specific data storage.
 
-### Pattern: The Flow Orchestrator
-This pattern allows the event system to trigger complex, predefined workflows stored in the `RCN_FLOWS` registry.
+**YAML Config**:
+```yaml
+- function: py_periodic_cleanup
+  every: 1h
+  name: "system-cleanup"
+```
+
+**Python Handler**:
+```python
+@rcn_event()
+async def periodic_cleanup(event, *args):
+    # 1. Perform maintenance logic
+    # No 'require-storage' or 'get_unprocessed_entries' is used here
+    await clear_expired_cache()
+    await rotate_internal_logs()
+```
+
+### Pattern: Annotation Promotion (Child-to-Parent)
+Processes findings on child entities and promotes significant ones to the parent level for visibility.
 
 ```python
-from rcn_core.globals import RCN_FLOWS
+@rcn_event()
+async def promote_critical_findings(event, *args):
+    scanner_name = event.get("name")
+    
+    # Process annotations on child entries (e.g. found items)
+    async with get_unprocessed_annotations("critical-vuln", scanner_name, event) as items:
+        for item in items.values():
+            annotation = item["entry"]
+            parent = item["parent"] # The parent entity (e.g. Target)
+            
+            # Promote the finding to the parent level
+            add_annotation(
+                entry_id=parent["id"],
+                storage_name="entities", # Root storage
+                key="alert",
+                value=f"Critical finding on {parent.get('site')}: {annotation['value']}",
+                parent_id=None
+            )
+```
+
+### Pattern: External Service Health Check
+Periodically verifies the availability of external resources and updates the system state or notifies administrators.
+
+**YAML Config**:
+```yaml
+- function: py_check_external_service
+  every: 5m
+  name: "service-health-monitor"
+  service_url: "https://api.external-service.com/health"
+```
+
+**Python Handler**:
+```python
+import aiohttp
 
 @rcn_event()
-async def flow_orchestrator_handler(event, *args):
-    # 1. Identify the flow to run (can be defined in YAML)
-    flow_name = event.get("flow", "default-flow")
-    flow_fn = RCN_FLOWS.get(flow_name)
+async def check_external_service(event, *args):
+    url = event.get("service_url")
     
-    if not flow_fn:
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as resp:
+                is_up = resp.status == 200
+    except Exception:
+        is_up = False
+    
+    if not is_up:
+        # Log failure or take corrective action
+        print(f"CRITICAL: External service at {url} is DOWN")
+        # Update a global status flag in metadata
+        get_storage().storage_md_set("external-service-status", "DOWN")
+```
+
+### Pattern: Filesystem Housekeeping
+Cleans up temporary files, logs, or cache directories based on custom logic (e.g., file age).
+
+```python
+import os
+import time
+
+@rcn_event()
+async def cleanup_temp_files(event, *args):
+    temp_dir = "/tmp/rcn-scans/"
+    max_age_seconds = event.get("max_age_hours", 24) * 3600
+    current_time = time.time()
+    
+    if not os.path.exists(temp_dir):
         return
-    
-    async with get_unprocessed_entries(event["name"], event) as items:
-        for item in items.values():
-            entry = item["entry"]
-            
-            # 2. Instantiate the Flow
-            flow = flow_fn()
-            
-            # 3. Pass data from the entry and event config
-            flow.set_data(entry)
-            flow.set_config(event)
-            
+        
+    for filename in os.listdir(temp_dir):
+        file_path = os.path.join(temp_dir, filename)
+        if os.path.getmtime(file_path) < (current_time - max_age_seconds):
             try:
-                # 4. Run the Flow asynchronously
-                result = await flow.run()
-                
-                # 5. Handle output...
-                process_flow_results(result)
+                os.remove(file_path)
             except Exception as e:
-                # 6. Errors are raised back to the scheduler
-                raise e
+                print(f"Failed to delete {file_path}: {e}")
+```
+
+### Pattern: Data Integrity Auditor
+Queries storage to identify orphan entries or inconsistent data and logs them for review.
+
+```python
+@rcn_event()
+async def audit_storage_integrity(event, *args):
+    # This task queries all entries in a storage to perform a cross-check
+    st = get_storage().get_storage_create("entities")
+    all_entries = st.get()
+    
+    orphans = []
+    for entry in all_entries:
+        # Custom logic to identify inconsistent data
+        if not entry.get("required_field") or entry.get("parent_id") == "deleted":
+            orphans.append(entry["id"])
+            
+    if orphans:
+        print(f"AUDIT: Found {len(orphans)} inconsistent entries in 'entities' storage.")
+        # Perform cleanup or move to 'quarantine' storage
 ```
 
 ---
 
-## 7. Full Pipeline Case Study: Discovery to Validation
+## 8. Full Pipeline Case Study: Discovery to Validation
+
 
 This example shows a three-stage pipeline: **Discovery** -> **AI Annotation** -> **Functional Validation**.
 

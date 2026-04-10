@@ -11,8 +11,8 @@ from fastapi.responses import JSONResponse, HTMLResponse
 
 import rcn_core.globals
 
-from rcn_web.core.utils import get_storage
-from rcn_core.storage.target_storage import TargetStorage
+from rcn_web.core.utils import get_storage, get_root_storage
+from rcn_core.storage.target_storage import MultiTargetStorage as TargetStorage
 from rcn_web.storage.url.utils import add_gau_entries
 
 # from rcn_web.proxy.collect_js import handle_collected_js_files
@@ -170,7 +170,7 @@ async def add_annotation(request: Request) -> JSONResponse:
     value = content.get("value")
     storage_name = content.get("storage", "web-apps::annotations")
 
-    app = get_app_by_site(get_storage(), site)
+    app = get_app_by_site(get_root_storage(), site)
     if not app:
         return JSONResponse({"added": False, "error": "App not found"}, status_code=404)
 
@@ -188,7 +188,7 @@ async def get_annotations(request: Request) -> JSONResponse:
     entry_id = content.get("entry_id")
     storage_name = content.get("storage", "web-apps::annotations")
 
-    app = get_app_by_site(get_storage(), site)
+    app = get_app_by_site(get_root_storage(), site)
     if not app:
         return JSONResponse({"annotations": [], "error": "App not found"}, status_code=404)
 
@@ -206,7 +206,7 @@ class AppPreviewRequest(BaseModel):
 @router.post("/preview_apps")
 async def preview_apps(request: AppPreviewRequest):
     from rcn_core.storage.bases import get_storage_create
-    st = get_storage()
+    st = get_root_storage()
     if not st:
         return JSONResponse("No storage loaded.", status_code=404)
     

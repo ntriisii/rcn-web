@@ -23,7 +23,7 @@ class TestMCPStandardized:
         mock_target.targets = {} # Not a MultiTargetStorage for this test
         mock_target.get_storage_create.return_value = mock_storage
         
-        with patch("rcn_web.routes.mcp_api.get_storage", return_value=mock_target):
+        with patch("rcn_web.core.utils.get_root_storage", return_value=mock_target):
             response = client.post("/mcp/view", json={
                 "collection": "web-apps",
                 "filter": "entry['id'] == 1"
