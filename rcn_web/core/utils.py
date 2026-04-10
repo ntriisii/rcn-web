@@ -120,6 +120,15 @@ def is_in_scope(asset_identifier: str):
 
 
 def get_app_by_site(target_storage_obj, app_site: str):
+    if not target_storage_obj:
+        return None
+
+    if hasattr(target_storage_obj, "targets"):
+        for t in target_storage_obj.targets.values():
+            app = get_app_by_site(t, app_site)
+            if app:
+                return app
+        return None
 
     st_list = target_storage_obj.get_storage_create("web-apps")
     st = st_list[0] if isinstance(st_list, list) and st_list else st_list
@@ -676,13 +685,6 @@ def web_match_storage(match_str, target=None):
     if match_str == "flows":
         st = RemoteFlowsAdapter.get_instance()
         return [{"storage": st, "parent": get_root_storage()}]
-
-    # Special case: "targets" — delegate to core match_storage which returns
-    # the targets table storage directly.  Expanding across targets would be
-    # wrong here because the caller wants the raw target entries.
-    if match_str == "targets":
-        from rcn_core.data_access import match_storage as _core_match_storage
-        return _core_match_storage("targets", target=None)
 
     # Handle target_context dict (used when expanding across targets)
     if isinstance(target, dict) and "_storage_obj" in target:

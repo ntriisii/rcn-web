@@ -17,44 +17,31 @@ def _resolve_target(item):
     If it is a plain dict, look up the parent and resolve via
     parent.get_target_storage(name).
     """
-    from rcn_core.log import rlog
     target = item["entry"]
-    rlog(f"_resolve_target: entry type={type(target).__name__}, entry={target}", level="info")
 
     # Already a rich object (e.g. MockTargetEntry in tests)
     if hasattr(target, "storage_md_get") and hasattr(target, "config"):
-        rlog("_resolve_target: entry is already a rich object", level="info")
         return target
 
     # Plain dict — need to resolve via parent
     parent = item.get("parent")
-    rlog(f"_resolve_target: parent={parent}, type={type(parent).__name__ if parent else None}", level="info")
     if parent is None:
-        rlog("_resolve_target: no parent, returning None", level="info")
         return None
 
     target_name = target.get("name")
     if not target_name:
-        rlog(f"_resolve_target: no 'name' in entry, returning None", level="info")
         return None
 
     # parent may be MultiTargetStorage or another container with
     # get_target_storage(name)
     if hasattr(parent, "get_target_storage"):
-        rlog(f"_resolve_target: resolving via parent.get_target_storage('{target_name}')", level="info")
-        result = parent.get_target_storage(target_name)
-        rlog(f"_resolve_target: result={result}, type={type(result).__name__ if result else None}", level="info")
-        return result
+        return parent.get_target_storage(target_name)
 
     # Try get_root_storage as fallback
     root = get_root_storage()
-    rlog(f"_resolve_target: fallback root={root}, type={type(root).__name__ if root else None}", level="info")
     if root and hasattr(root, "get_target_storage"):
-        result = root.get_target_storage(target_name)
-        rlog(f"_resolve_target: fallback result={result}", level="info")
-        return result
+        return root.get_target_storage(target_name)
 
-    rlog("_resolve_target: could not resolve, returning None", level="info")
     return None
 
 
@@ -64,12 +51,8 @@ async def handle_init_target(event, scheduled_md):
     event_ctx["require-storage"] = "targets"
     event_ctx["max-entries"] = 1
     async with get_unprocessed_entries("init-recon", event_ctx, target=None, match_storage_fn=web_match_storage) as entries:
-        from rcn_core.log import rlog
-        rlog(f"init-recon: got {len(entries)} unprocessed entries", level="info")
-        for key, item in entries.items():
-            rlog(f"init-recon: item key={key}, entry type={type(item['entry']).__name__}, entry={item.get('entry')}", level="info")
+        for item in entries.values():
             target = _resolve_target(item)
-            rlog(f"init-recon: resolved target={target}, type={type(target).__name__ if target else None}", level="info")
             if target is None:
                 continue
 
