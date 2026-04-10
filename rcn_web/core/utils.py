@@ -212,18 +212,19 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
 
 
 def get_target_for_site(target_storage_obj, site):
-    from rcn_web.core.scope import check_domain_in_scope
+    from rcn_web.core.scope import (
+        check_domain_in_scope,
+        get_config_wildcards,
+        get_config_urls,
+    )
 
     mts = get_target_storage()
     for target_data in mts.targets_storage.get():
         config = get_target_config(target_data["name"])
-        scope = config.get("scope") if isinstance(config, dict) else None
-        if not scope or not isinstance(scope, dict):
-            continue
-        wildcards = scope.get("wildcards", [])
-        urls = scope.get("urls", [])
-        wildcards = [i.replace("*.", ".").replace("*", "") for i in wildcards]
-        check_scope = {"wildcards": wildcards, "urls": urls}
+        check_scope = {
+            "wildcards": get_config_wildcards(config),
+            "urls": get_config_urls(config),
+        }
         if check_domain_in_scope(site, check_scope):
             return mts.get_target_storage(target_data["name"])
 
@@ -237,7 +238,11 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     if not apps:
         return []
 
-    from rcn_web.core.scope import check_domain_in_scope
+    from rcn_web.core.scope import (
+        check_domain_in_scope,
+        get_config_wildcards,
+        get_config_urls,
+    )
 
     mts = get_target_storage()
 
@@ -246,16 +251,10 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     targets_info = []
     for target_data in targets_data:
         config = get_target_config(target_data["name"])
-        if not isinstance(config, dict):
-            continue
-        scope = config.get("scope")
-        if not isinstance(scope, dict):
-            continue
-
-        wildcards = [
-            i.replace("*.", ".").replace("*", "") for i in scope.get("wildcards", [])
-        ]
-        check_scope = {"wildcards": wildcards, "urls": scope.get("urls", [])}
+        check_scope = {
+            "wildcards": get_config_wildcards(config),
+            "urls": get_config_urls(config),
+        }
 
         targets_info.append(
             {
