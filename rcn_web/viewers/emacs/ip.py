@@ -78,10 +78,24 @@ def make_ip_tabulated_entries(ip_data, match_groups, **kwargs):
         ("cpes", 20),
     )
 
-    from rcn_web.core.utils import ListStorage
+    class _ListView:
+        __slots__ = ("data", "length")
+        def __init__(self, d): self.data = d; self.length = len(d)
+        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+            res = self.data
+            if query_node is not None:
+                res = [e for e in res if query_node.evaluate(e)]
+            if after_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
+                if idx != -1: res = res[idx + 1:]
+            elif before_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
+                if idx != -1: res = res[:idx]
+            if sort_desc: res = res[::-1]
+            return res[:limit]
 
     tbl_entries, tabl_format = make_preview_tabulated_entries(
-        ListStorage(ip_data, "found-ips"), attrs, match_groups=match_groups, **kwargs
+        _ListView(ip_data), attrs, match_groups=match_groups, **kwargs
     )
 
     return tbl_entries, tabl_format

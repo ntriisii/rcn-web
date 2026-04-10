@@ -20,61 +20,6 @@ from multidict import MultiDict
 from urllib.parse import urlparse, ParseResult
 
 
-class ListStorage:
-    def __init__(self, data, storage_name="list-proxy"):
-        self.data = data
-        self.storage_name = storage_name
-        self.length = len(data)
-
-    def get_view_data(
-        self,
-        query_node=None,
-        limit=100,
-        after_id=None,
-        before_id=None,
-        sort_desc=True,
-    ):
-        res = self.data
-        if query_node is not None:
-            res = [e for e in res if query_node.evaluate(e)]
-
-        # Simple ID-based pagination for the proxy
-        if after_id is not None:
-            idx = -1
-            for i, e in enumerate(res):
-                if str(e.get("id")) == str(after_id):
-                    idx = i
-                    break
-            if idx != -1:
-                res = res[idx + 1 :]
-        elif before_id is not None:
-            idx = -1
-            for i, e in enumerate(res):
-                if str(e.get("id")) == str(before_id):
-                    idx = i
-                    break
-            if idx != -1:
-                res = res[:idx]
-
-        if sort_desc:
-            res = res[::-1]
-
-        return res[:limit]
-
-    def get_text_preview(self, filter=None) -> str:
-        items = self.get_view_data(limit=5)
-        from rcn_core.mcp.utils import format_entries_text
-
-        header = f"Storage: {self.storage_name}\nEntries: {len(self.data)}\n"
-        return header + format_entries_text(items, self.storage_name)
-
-    def get_text_view(self, page=1, limit=200, filter=None) -> str:
-        items = self.get_view_data(limit=limit)
-        from rcn_core.mcp.utils import format_entries_text
-
-        return format_entries_text(items, self.storage_name)
-
-
 import rcn_core.globals
 from rcn_core.decorators import rcn_event
 from rcn_core.log import rlog

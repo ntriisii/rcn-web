@@ -329,10 +329,26 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
     # include more attrs
     attrs = (("todos", 4),) + attrs + st_attrs + (("at", 4),)
 
-    from rcn_web.core.utils import ListStorage
+    _entries = list(tabl_entries.values())
+
+    class _ListView:
+        __slots__ = ("data", "length")
+        def __init__(self, d): self.data = d; self.length = len(d)
+        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+            res = self.data
+            if query_node is not None:
+                res = [e for e in res if query_node.evaluate(e)]
+            if after_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
+                if idx != -1: res = res[idx + 1:]
+            elif before_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
+                if idx != -1: res = res[:idx]
+            if sort_desc: res = res[::-1]
+            return res[:limit]
 
     return make_preview_tabulated_entries(
-        ListStorage(list(tabl_entries.values()), "web-apps"),
+        _ListView(_entries),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,
@@ -645,10 +661,26 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
     attrs = (*attrs, ("links", 4), ("todos", 4))
 
     # include more attrs
-    from rcn_web.core.utils import ListStorage
+    _entries = list(tabl_entries.values())
+
+    class _ListView:
+        __slots__ = ("data", "length")
+        def __init__(self, d): self.data = d; self.length = len(d)
+        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+            res = self.data
+            if query_node is not None:
+                res = [e for e in res if query_node.evaluate(e)]
+            if after_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
+                if idx != -1: res = res[idx + 1:]
+            elif before_id is not None:
+                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
+                if idx != -1: res = res[:idx]
+            if sort_desc: res = res[::-1]
+            return res[:limit]
 
     return make_preview_tabulated_entries(
-        ListStorage(list(tabl_entries.values()), "web-apps"),
+        _ListView(_entries),
         attrs,
         match_groups=match_groups,
         match_fn=apps_match_fn,
