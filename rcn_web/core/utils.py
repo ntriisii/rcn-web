@@ -220,10 +220,10 @@ def get_target_for_site(target_storage_obj, site):
 
     mts = get_target_storage()
     for target_data in mts.targets_storage.get():
-        config = get_target_config(target_data["name"])
+        cfg = get_target_config(target_data["name"])
         check_scope = {
-            "wildcards": get_config_wildcards(config),
-            "urls": get_config_urls(config),
+            "wildcards": get_config_wildcards(cfg),
+            "urls": get_config_urls(cfg),
         }
         if check_domain_in_scope(site, check_scope):
             return mts.get_target_storage(target_data["name"])
@@ -250,26 +250,22 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     targets_data = mts.targets_storage.get()
     targets_info = []
     for target_data in targets_data:
-        config = get_target_config(target_data["name"])
+        cfg = get_target_config(target_data["name"])
         check_scope = {
-            "wildcards": get_config_wildcards(config),
-            "urls": get_config_urls(config),
+            "wildcards": get_config_wildcards(cfg),
+            "urls": get_config_urls(cfg),
         }
 
         targets_info.append(
             {
+                "id": target_data["id"],
                 "check_scope": check_scope,
-                "target_obj": mts.get_target_storage(target_data["name"]),
             }
         )
 
-    default_target = None
-    if targets_info:
-        default_target = targets_info[0]["target_obj"]
-    elif targets_data:
-        default_target = mts.get_target_storage(targets_data[0]["name"])
+    default_target_id = targets_data[0]["id"] if targets_data else None
 
-    # 2. Group apps by target
+    # 2. Group apps by target ID
     target_groups = defaultdict(list)
     for app_data in apps:
         domain = app_data.get("input")
@@ -282,23 +278,23 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
             if url:
                 domain = urlparse(url).hostname
 
-        target = None
+        target_id = None
         if domain:
             for t_info in targets_info:
                 if check_domain_in_scope(domain, t_info["check_scope"]):
-                    target = t_info["target_obj"]
+                    target_id = t_info["id"]
                     break
 
-        if not target:
-            target = default_target
+        if not target_id:
+            target_id = default_target_id
 
-        if target:
-            target_groups[target].append(app_data)
+        if target_id:
+            target_groups[target_id].append(app_data)
 
     # 3. Add apps for each target
     all_added = []
-    for target, target_apps in target_groups.items():
-        st_list = target.get_storage_create("web-apps")
+    for target_id, target_apps in target_groups.items():
+        st_list = mts.get_storage_create("web-apps", parent_id=target_id)
         if not st_list:
             continue
 
@@ -327,10 +323,7 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
 
             if to_add:
                 added = st.add_many(to_add)
-                if added:
-                    all_added.extend(added)
-                else:
-                    all_added.extend(to_add)
+                all_added.extend(added or to_add)
 
     return all_added
 
