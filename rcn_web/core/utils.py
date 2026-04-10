@@ -185,21 +185,17 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
 
 
 def get_apps(target_storage_obj):
+    """Collect apps across ALL targets."""
     if not target_storage_obj:
         return []
-    if hasattr(target_storage_obj, "targets"):
-        all_apps = []
-        for tname, t in target_storage_obj.targets.items():
-            if tname == "__multi_target__":
-                continue
-            all_apps.extend(get_apps(t))
-        return all_apps
-
-    apps_list = target_storage_obj.get_storage_create("web-apps")
-    apps = apps_list[0] if isinstance(apps_list, list) and apps_list else apps_list
-    if not apps:
-        return []
-    return apps.get()
+    all_apps = []
+    for target_data in target_storage_obj.targets_storage.get():
+        apps_list = target_storage_obj.get_storage_create("web-apps", parent_id=target_data["id"])
+        if apps_list:
+            for wa in apps_list:
+                if wa:
+                    all_apps.extend(wa.get())
+    return all_apps
 
 
 def get_uniq_apps(target_storage_obj) -> "list[dict]":
@@ -219,29 +215,18 @@ def get_uniq_apps(target_storage_obj) -> "list[dict]":
     if not target_storage_obj:
         return []
 
-    # 1. Collect apps with their associated target objects
+    # 1. Collect apps with their associated target objects across ALL targets
     apps_with_targets = []
-    if hasattr(target_storage_obj, "targets"):
-        for tname, t in target_storage_obj.targets.items():
-            if tname == "__multi_target__":
-                continue
-            wa_storages = t.get_storage_create("web-apps")
-            if isinstance(wa_storages, list):
-                wa_storages = wa_storages[0] if wa_storages else None
-            if not wa_storages:
-                continue
-            apps = wa_storages.get()
-            for app in apps:
-                apps_with_targets.append((app, t))
-    else:
-        wa_storages = target_storage_obj.get_storage_create("web-apps")
-        if isinstance(wa_storages, list):
-            wa_storages = wa_storages[0] if wa_storages else None
+    for target_data in target_storage_obj.targets_storage.get():
+        wa_storages = target_storage_obj.get_storage_create("web-apps", parent_id=target_data["id"])
         if not wa_storages:
-            return []
-        apps = wa_storages.get()
+            continue
+        wa = wa_storages[0] if wa_storages else None
+        if not wa:
+            continue
+        apps = wa.get()
         for app in apps:
-            apps_with_targets.append((app, target_storage_obj))
+            apps_with_targets.append((app, target_data))
 
     if not apps_with_targets:
         return []
@@ -701,7 +686,13 @@ def web_match_storage(match_str, target=None):
         st = RemoteFlowsAdapter.get_instance()
         return [{"storage": st, "parent": get_root_storage()}]
 
-    current_storage = target if target else get_root_storage()
+    # Handle target_context dict (used when expanding across targets)
+    if isinstance(target, dict) and "_storage_obj" in target:
+        current_storage = target["_storage_obj"]
+        target_id = target.get("id")
+    else:
+        current_storage = target if target else get_root_storage()
+        target_id = None
 
     # Priority 1: Direct resolution for hierarchical names that exist as actual tables.
     # This avoids over-expansion when a specific collection is requested.
@@ -710,7 +701,8 @@ def web_match_storage(match_str, target=None):
         and match_str in current_storage.schema_cache
     ):
         try:
-            st_list = current_storage.get_storage_create(match_str)
+            parent_id = target_id if target_id else None
+            st_list = current_storage.get_storage_create(match_str, parent_id=parent_id)
             # Flatten list returns so each item is a single storage
             if isinstance(st_list, list):
                 return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
@@ -718,25 +710,19 @@ def web_match_storage(match_str, target=None):
         except:
             pass
     
-    if hasattr(current_storage, "targets") and target is None:
-        found_storages = []
-        for tname, t in current_storage.targets.items():
-            if tname == "__multi_target__":
-                continue
-            found_storages.extend(web_match_storage(match_str, target=t))
-        return found_storages
-
-    # If no target was passed and we got a single TargetStorage, also check
-    # whether we should expand across all targets
     if target is None:
-        ts = get_target_storage()
-        if ts and hasattr(ts, "targets_storage"):
-            found_storages = []
-            for td in ts.targets_storage.get():
-                t = ts.get_target_storage(td["name"])
-                found_storages.extend(web_match_storage(match_str, target=t))
-            if found_storages:
-                return found_storages
+        # Expand across all targets
+        found_storages = []
+        for td in current_storage.targets_storage.get():
+            # Create a wrapper that acts as a single target context
+            target_context = {
+                "id": td["id"],
+                "name": td["name"],
+                "_storage_obj": current_storage,
+            }
+            found_storages.extend(web_match_storage(match_str, target=target_context))
+        if found_storages:
+            return found_storages
     
     parts = match_str.split("::")
     is_annotations = parts[-1] == "annotations"
@@ -773,7 +759,7 @@ def web_match_storage(match_str, target=None):
 
                 return to_return
 
-            st_list = current_storage.get_storage_create("web-apps")
+            st_list = current_storage.get_storage_create("web-apps", parent_id=target_id)
             if isinstance(st_list, list):
                 return [{"storage": s, "parent": current_storage} for s in st_list if s is not None]
             return [{"storage": st_list, "parent": current_storage}]
