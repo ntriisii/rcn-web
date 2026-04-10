@@ -67,9 +67,6 @@ def is_in_scope(asset_identifier: str):
 
 
 def get_app_by_site(target_storage_obj, app_site: str):
-    if not target_storage_obj:
-        return None
-
     for st in target_storage_obj.get_storage_create("web-apps"):
         if st.storage_name not in st._schema_cache:
             continue
@@ -103,12 +100,11 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
 
 def get_apps(target_storage_obj):
     """Collect apps across all targets."""
-    if not target_storage_obj:
-        return []
+
     all_apps = []
     for st in target_storage_obj.get_storage_create("web-apps"):
-        if st:
-            all_apps.extend(st.get())
+        all_apps.extend(st.get())
+
     return all_apps
 
 
@@ -244,7 +240,7 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
         get_config_urls,
     )
 
-    mts = get_target_storage()
+    mts = target_storage_obj
 
     # 1. Bulk collect targets and their scopes
     targets_data = mts.targets_storage.get()
@@ -256,27 +252,39 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
             "urls": get_config_urls(cfg),
         }
 
-        targets_info.append(
-            {
-                "id": target_data["id"],
-                "check_scope": check_scope,
-            }
-        )
+        targets_info.append({"id": target_data["id"], "check_scope": check_scope})
 
     default_target_id = targets_data[0]["id"] if targets_data else None
 
     # 2. Group apps by target ID
+    required_keys = [
+        "title",
+        "method",
+        "tech",
+        "status_code",
+        "technologies",
+        "input_domain",
+        "port",
+        "site",
+        "host",
+        "url",
+        "scheme",
+    ]
+
     target_groups = defaultdict(list)
     for app_data in apps:
-        domain = app_data.get("input")
+        # Extract only required keys
+        filtered_app = {k: app_data[k] for k in required_keys if k in app_data}
+
+        domain = filtered_app.get("input")
         if not domain:
             url = (
-                app_data.get("url")
-                or app_data.get("final_url")
-                or app_data.get("location")
+                filtered_app.get("url")
+                or filtered_app.get("final_url")
+                or filtered_app.get("location")
             )
             if url:
-                domain = urlparse(url).hostname
+                domain = urlparse(url).netloc
 
         target_id = None
         if domain:
@@ -285,45 +293,15 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
                     target_id = t_info["id"]
                     break
 
-        if not target_id:
-            target_id = default_target_id
-
         if target_id:
-            target_groups[target_id].append(app_data)
+            target_groups[target_id].append(filtered_app)
 
     # 3. Add apps for each target
     all_added = []
     for target_id, target_apps in target_groups.items():
-        st_list = mts.get_storage_create("web-apps", parent_id=target_id)
-        if not st_list:
-            continue
-
-        for st in st_list:
-            if st.storage_name not in st._schema_cache:
-                continue
-
-            # Deduplicate against existing apps in this target
-            existing_sites = set()
-            with st.get_connection() as conn:
-                cursor = conn.execute(f"SELECT site FROM {st.table_name}")
-                existing_sites = {row[0] for row in cursor.fetchall()}
-
-            to_add = []
-            for app in target_apps:
-                site = app.get("site")
-                if not site:
-                    url = app.get("url") or app.get("final_url") or app.get("location")
-                    if url:
-                        site = urlparse(url).netloc
-
-                if site and site not in existing_sites:
-                    app["site"] = site
-                    to_add.append(app)
-                    existing_sites.add(site)
-
-            if to_add:
-                added = st.add_many(to_add)
-                all_added.extend(added or to_add)
+        st = mts.get_storage_create("web-apps", parent_id=target_id)[0]
+        added = st.add_many(target_apps)
+        all_added.extend(target_apps)
 
     return all_added
 
