@@ -87,7 +87,7 @@ def get_app_by_id(target_storage_obj, app_id: str | int):
         return None
 
     for st in target_storage_obj.get_storage_create("web-apps"):
-        if st.storage_name not in st._schema_cache:
+        if st.storage_name not in st.schema_cache:
             continue
         with st.get_connection() as conn:
             cursor = conn.execute(

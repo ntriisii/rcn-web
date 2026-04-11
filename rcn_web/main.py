@@ -275,6 +275,15 @@ async def get_app_data(app_id):
     return JSONResponse(data)
 
 
+def _get_st_data(st_list):
+    if not st_list:
+        return []
+    data = []
+    for st in st_list:
+        data.extend(st.get())
+    return data
+
+
 @app.post("/getApp")
 async def get_app_more_data(req: Request):
     data = await req.json()
@@ -320,9 +329,11 @@ async def get_app_more_data(req: Request):
                             + i["path"],
                             **i,
                         }
-                        for i in get_storage_create(
-                            "web-apps::app-links", parent_id=app["id"]
-                        ).get()
+                        for i in _get_st_data(
+                            get_storage_create(
+                                "web-apps::app-links", parent_id=app["id"]
+                            )
+                        )
                     ],
                     "fuzzing-urls": [
                         {
@@ -332,9 +343,11 @@ async def get_app_more_data(req: Request):
                             + app["site"]
                             + i["path"],
                         }
-                        for i in get_storage_create(
-                            "web-apps::fuzzing-data", parent_id=app["id"]
-                        ).get()
+                        for i in _get_st_data(
+                            get_storage_create(
+                                "web-apps::fuzzing-data", parent_id=app["id"]
+                            )
+                        )
                     ],
                     "js-flows": [
                         {
@@ -345,19 +358,25 @@ async def get_app_more_data(req: Request):
                             + "/"
                             + (i.get("url") or i["path"]).lstrip("/"),
                         }
-                        for i in get_storage_create(
-                            "web-apps::js-flows", parent_id=app["id"]
-                        ).get()
+                        for i in _get_st_data(
+                            get_storage_create(
+                                "web-apps::js-flows", parent_id=app["id"]
+                            )
+                        )
                     ],
-                    "nuclei-scanning": get_storage_create(
-                        "web-apps::nuclei-scanning", parent_id=app["id"]
-                    ).get(),
-                    "js-secrets": get_storage_create(
-                        "web-apps::js-secrets", parent_id=app["id"]
-                    ).get(),
-                    "trufflehog-secrets": get_storage_create(
-                        "web-apps::trufflehog-secrets", parent_id=app["id"]
-                    ).get(),
+                    "nuclei-scanning": _get_st_data(
+                        get_storage_create(
+                            "web-apps::nuclei-scanning", parent_id=app["id"]
+                        )
+                    ),
+                    "js-secrets": _get_st_data(
+                        get_storage_create("web-apps::js-secrets", parent_id=app["id"])
+                    ),
+                    "trufflehog-secrets": _get_st_data(
+                        get_storage_create(
+                            "web-apps::trufflehog-secrets", parent_id=app["id"]
+                        )
+                    ),
                 }
             )
 
@@ -651,6 +670,8 @@ async def get_all_annotations():
 
 @app.get("debug")
 def debug_scanners():
-    scheduled_storage = get_target_storage().get_storage_create("scheduled").get()
+    scheduled_storage = _get_st_data(
+        get_target_storage().get_storage_create("scheduled")
+    )
 
     return JSONResponse(scheduled_storage)

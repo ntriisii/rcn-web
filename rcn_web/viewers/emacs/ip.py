@@ -80,18 +80,42 @@ def make_ip_tabulated_entries(ip_data, match_groups, **kwargs):
 
     class _ListView:
         __slots__ = ("data", "length")
-        def __init__(self, d): self.data = d; self.length = len(d)
-        def get_view_data(self, query_node=None, limit=100, after_id=None, before_id=None, sort_desc=True):
+
+        def __init__(self, d):
+            self.data = d
+            self.length = len(d)
+
+        def get_view_data(
+            self,
+            query_node=None,
+            limit=100,
+            after_id=None,
+            before_id=None,
+            sort_desc=True,
+        ):
             res = self.data
             if query_node is not None:
                 res = [e for e in res if query_node.evaluate(e)]
             if after_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)), -1)
-                if idx != -1: res = res[idx + 1:]
+                idx = next(
+                    (i for i, e in enumerate(res) if str(e.get("id")) == str(after_id)),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[idx + 1 :]
             elif before_id is not None:
-                idx = next((i for i, e in enumerate(res) if str(e.get("id")) == str(before_id)), -1)
-                if idx != -1: res = res[:idx]
-            if sort_desc: res = res[::-1]
+                idx = next(
+                    (
+                        i
+                        for i, e in enumerate(res)
+                        if str(e.get("id")) == str(before_id)
+                    ),
+                    -1,
+                )
+                if idx != -1:
+                    res = res[:idx]
+            if sort_desc:
+                res = res[::-1]
             return res[:limit]
 
     tbl_entries, tabl_format = make_preview_tabulated_entries(
@@ -133,9 +157,22 @@ def extract_censys_relevant_data(censys_entry):
 
 
 def ips_all_sources_info():
-    internetdb_content = get_target_storage().get_storage_create("shodan-internetdb-ips").get()
-    shodan_content = get_target_storage().get_storage_create("shodan-scrapped-ips").get()
-    censys_content = get_target_storage().get_storage_create("censys-ips").get()
+    internetdb_st_list = get_target_storage().get_storage_create(
+        "shodan-internetdb-ips"
+    )
+    internetdb_content = []
+    for st in internetdb_st_list:
+        internetdb_content.extend(st.get())
+
+    shodan_st_list = get_target_storage().get_storage_create("shodan-scrapped-ips")
+    shodan_content = []
+    for st in shodan_st_list:
+        shodan_content.extend(st.get())
+
+    censys_st_list = get_target_storage().get_storage_create("censys-ips")
+    censys_content = []
+    for st in censys_st_list:
+        censys_content.extend(st.get())
     found_data = {}
 
     # MAYBE: just expand it in new list
@@ -242,12 +279,15 @@ def elisp_make_ip_view(ip):
 
         return link
 
-    internetdb_storage = get_target_storage().get_storage_create("shodan-internetdb-ips")
-    shodan_content = get_target_storage().get_storage_create("shodan-scrapped-ips")
-    censys_content = get_target_storage().get_storage_create("censys-ips")
+    internetdb_st_list = get_target_storage().get_storage_create(
+        "shodan-internetdb-ips"
+    )
+    shodan_st_list = get_target_storage().get_storage_create("shodan-scrapped-ips")
+    censys_st_list = get_target_storage().get_storage_create("censys-ips")
 
     idb_ip = None
-    if internetdb_storage:
+    if internetdb_st_list:
+        internetdb_storage = internetdb_st_list[0]
         idb_content = internetdb_storage.get()
         idb_ip = [i for i in idb_content if i["ip"] == ip]
 
@@ -257,7 +297,8 @@ def elisp_make_ip_view(ip):
             idb_ip = None
 
     s_ip = None
-    if shodan_content:
+    if shodan_st_list:
+        shodan_content = shodan_st_list[0]
         s_content = shodan_content.get()
         s_ip = [i for i in s_content if i["ip"] == ip]
 
@@ -293,7 +334,8 @@ def elisp_make_ip_view(ip):
 
     # check out censys data
     c_ip = None
-    if censys_content:
+    if censys_st_list:
+        censys_content = censys_st_list[0]
         cn_d = censys_content.get()
         entry = [i for i in cn_d if i["ip"] == ip]
         if entry:

@@ -45,10 +45,12 @@ def _resolve_storage_impl(
             except (ValueError, TypeError):
                 st_list = mts.get_storage_create(storage_name, parent_id=pid)
             return st_list[0] if st_list else None
-        return mts.get_storage_create(storage_name)
+        st_list = mts.get_storage_create(storage_name)
+        return st_list[0] if st_list else None
 
     # 4. Top-level resolution
-    return mts.get_storage_create(storage_name)
+    st_list = mts.get_storage_create(storage_name)
+    return st_list[0] if st_list else None
 
 
 # Create router using the standardized MCP routes from rcn-core

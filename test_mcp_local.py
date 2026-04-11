@@ -92,8 +92,7 @@ sys.path.insert(0, os.path.abspath("../pentest-utils"))
 # Monkey-patching rcn_core to fix bugs locally within this script
 from rcn_core.storage.bases import (
     AbstractDataStorage,
-    AnnotationStorage,
-    BaseSqliteStorage,
+    BasicDataStorage,
 )
 import rcn_core.storage.bases as bases_mod
 
@@ -176,7 +175,7 @@ web_utils.is_in_scope = lambda site: True
 from rcn_web.storage.utils import get_storage, get_app_by_site, web_match_storage
 from rcn_core.storage.bases import get_storage_create, STORAGE_CACHE
 from rcn_core.data_access import get_unprocessed_annotations
-from rcn_core.storage.target_storage import TargetStorage
+from rcn_core.storage.implementations import BasicDataStorage as TargetStorage
 import rcn_core.globals
 
 APP_NAME = "5dar.git.pz.epam.lvh.me:80"

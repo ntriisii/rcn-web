@@ -12,7 +12,7 @@ os.chdir(target_dir)
 from rcn_web.core.utils import web_match_storage
 from rcn_core.data_access import get_unprocessed_annotations, get_storage
 import rcn_core.globals
-from rcn_core.storage.target_storage import TargetStorage
+from rcn_core.storage.implementations import BasicDataStorage as TargetStorage
 
 # Load the YAML config
 with open(os.path.join(target_dir, "targets.yaml"), "r") as f:

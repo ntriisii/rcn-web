@@ -297,7 +297,7 @@ async def test_nuclei_scan_apps_happy_path(mock_event, mock_scheduled_md):
         patch(
             "rcn_web.scanning.utils.get_app_by_site", MagicMock(return_value=mock_app)
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch("rcn_web.scanning.utils.handle_nuclei_scanning_entries", AsyncMock()),
     ):
         mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file)
@@ -385,7 +385,7 @@ async def test_nuclei_scan_apps_happy_path(mock_event, mock_scheduled_md):
         patch(
             "rcn_web.scanning.utils.get_app_by_site", MagicMock(return_value=mock_app)
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch("rcn_web.scanning.utils.handle_nuclei_scanning_entries", AsyncMock()),
     ):
         mock_aiofiles_open.return_value.__aenter__ = AsyncMock(return_value=mock_file)
@@ -532,7 +532,7 @@ async def test_application_fuzzing_happy_path(mock_event, mock_scheduled_md):
             "rcn_web.scanning.utils.run_ffuf_scan",
             AsyncMock(return_value=ffuf_results),
         ) as mock_ffuf,
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
     ):
         await application_fuzzing(mock_event_with_wordlists, mock_scheduled_md)
 
@@ -621,7 +621,7 @@ async def test_application_fuzzing_with_valid_200_outliers(
             "rcn_web.scanning.utils.run_ffuf_scan",
             AsyncMock(return_value=ffuf_results),
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch(
             "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
         ),
@@ -686,7 +686,7 @@ async def test_application_fuzzing_aiohttp_error(mock_event, mock_scheduled_md):
             "rcn_web.scanning.utils.run_ffuf_scan",
             AsyncMock(return_value=ffuf_results),
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch(
             "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
         ),
@@ -761,7 +761,7 @@ async def test_application_fuzzing_with_valid_200_outliers(
             "rcn_web.scanning.utils.run_ffuf_scan",
             AsyncMock(return_value=ffuf_results),
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch(
             "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
         ),
@@ -830,7 +830,7 @@ async def test_application_fuzzing_aiohttp_error(mock_event, mock_scheduled_md):
             "rcn_web.scanning.utils.run_ffuf_scan",
             AsyncMock(return_value=ffuf_results),
         ),
-        patch("rcn_web.scanning.utils.get_storage_create", return_value=mock_storage),
+        patch("rcn_web.scanning.utils.get_storage_create", return_value=[mock_storage]),
         patch(
             "rcn_web.scanning.utils.aiohttp.ClientSession", return_value=mock_session
         ),

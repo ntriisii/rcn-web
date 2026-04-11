@@ -10,6 +10,26 @@ from rcn_web.core.utils import web_match_storage, get_target_storage, get_target
 from rcn_core.decorators import rcn_event
 
 
+def _resolve_target(item):
+    """Resolve a dict entry from the targets table to a TargetStorage object."""
+    target = item["entry"]
+
+    # Already a rich object (e.g. MockTargetEntry in tests)
+    if hasattr(target, "storage_md_get") and hasattr(target, "name"):
+        return target
+
+    # Plain dict — resolve via parent (MultiTargetStorage)
+    parent = item.get("parent")
+    if parent is None:
+        return None
+
+    target_name = target.get("name")
+    if not target_name:
+        return None
+
+    return parent.get_target_storage(target_name)
+
+
 @rcn_event()
 async def handle_init_target(event, scheduled_md):
     event_ctx = event.copy()
@@ -20,43 +40,68 @@ async def handle_init_target(event, scheduled_md):
     async with get_unprocessed_entries(
         "init-recon", event_ctx, target=None, match_storage_fn=web_match_storage
     ) as entries:
-        for target_obj in entries.values():
-            target = target_obj["entry"]
+        for item in entries.values():
+            target = _resolve_target(item)
+            if target is None:
+                continue
+
+            if target.storage_md_get("init-recon-finished"):
+                continue
+            if target.storage_md_get("init-recon-running"):
+                continue
+
             flow_fn = RCN_FLOWS.get("init-flow")
             if not flow_fn:
                 return
 
             flow = flow_fn()
 
+            target_name = target.name
             # Use web scope helpers
-            cfg = get_target_config(target["name"])
+            cfg = get_target_config(target_name)
             wildcards = get_config_wildcards(cfg)
             urls = get_config_urls(cfg)
 
             flow.set_data(wildcards)
-            out = await flow.run()
 
-            out = [i.replace("..", ".").strip(".") for i in out]
-            out = list(sorted(out, key=len))
-            out = [i for i in urls + out]
+            target.storage_md_set("init-recon-running", True)
+            target.storage_md_set(
+                "init-recon-started-time", datetime.datetime.now().timestamp()
+            )
 
-            out = uniq(out)
+            try:
+                out = await flow.run()
 
-            with open(
-                mts.target_directory / f"{target['name']}_domains.txt", "a+"
-            ) as f:
-                for d in out:
-                    f.write(d + "\n")
+                out = [i.replace("..", ".").strip(".") for i in out]
+                out = list(sorted(out, key=len))
+                out = [i for i in urls + out]
 
-            all_inscope = wildcards + urls
-            filtered_out = []
-            for domain in out:
-                if any(i in domain for i in all_inscope):
-                    filtered_out.append(domain)
+                out = uniq(out)
 
-            out = filtered_out
+                with open(
+                    mts.target_directory / f"{target_name}_domains.txt", "a+"
+                ) as f:
+                    for d in out:
+                        f.write(d + "\n")
 
-            domain_st_list = get_storage_create("domains", parent_id=target["id"])
-            if domain_st_list:
-                domain_st = domain_st_list[0]
-                domain_st.add_many([{"domain": i} for i in out], source="init-domains")
+                all_inscope = wildcards + urls
+                filtered_out = []
+                for domain in out:
+                    if any(i in domain for i in all_inscope):
+                        filtered_out.append(domain)
+
+                out = filtered_out
+
+                target_id = target.id
+                domain_st_list = get_storage_create("domains", parent_id=target_id)
+                if domain_st_list:
+                    domain_st = domain_st_list[0]
+                    domain_st.add_many(
+                        [{"domain": i} for i in out], source="init-domains"
+                    )
+
+                target.storage_md_set("init-recon-finished", True)
+                target.storage_md_set("init-recon-running", False)
+            except Exception as e:
+                target.storage_md_set("init-recon-running", False)
+                raise e

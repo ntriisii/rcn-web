@@ -29,7 +29,6 @@ def handle_shodan_io_request(response):
         found_info = gen_info.text.split("\n\n")[1:]
         found_info = [i for i in found_info if i][1:]
         for i in found_info:
-
             i = i.strip()
 
             # only a key without a value, values may follow in upcoming lines
@@ -118,7 +117,6 @@ def handle_shodan_io_request(response):
 
 
 async def get_shodan_ip_data(ip: str):
-
     if not ip:
         return
     out = dict()
@@ -172,27 +170,27 @@ def add_found_ips(entries):
 
 def handle_shodan_io_content(content):
     st = get_target_storage()
-    shodan_storage = st.get_storage_create("shodan-scrapped-ips")
-    found_ips = st.get_storage_create("found-ips")
-    subdomains = st.get_storage_create("domains")
+    shodan_st_list = st.get_storage_create("shodan-scrapped-ips")
+    found_ips_st_list = st.get_storage_create("found-ips")
+    subdomains_st_list = st.get_storage_create("domains")
 
-    shodan_storage.add_many(content, source="shodan")
-    found_ips.add_many([i["ip"] for i in content], source="shodan")
+    if shodan_st_list:
+        shodan_st_list[0].add_many(content, source="shodan")
+    if found_ips_st_list:
+        found_ips_st_list[0].add_many([i["ip"] for i in content], source="shodan")
 
     if content:
         content = content[0]
     else:
         return
 
-    if content.get("general-info"):
-        subdomains.add_many(
+    if content.get("general-info") and subdomains_st_list:
+        subdomains_st_list[0].add_many(
             [
                 i
                 for i in (
-                    (
-                        content["general-info"].get("domains", [])
-                        + content["general-info"].get("hostnames", [])
-                    )
+                    content["general-info"].get("domains", [])
+                    + content["general-info"].get("hostnames", [])
                 )
             ],
             source="shodan",
@@ -202,14 +200,39 @@ def handle_shodan_io_content(content):
 async def scan_shodan_for_ips(event, scheduled_md, matched_storages=[]):
     s = get_target_storage()
     debug = event.get("debug")
-    ip_storage = s.get_storage_create("found-ips")
+    ip_st_list = s.get_storage_create("found-ips")
+    ip_content = []
+    for st in ip_st_list:
+        ip_content.extend(st.get())
+
     repeat_checks_time = event.get("repeat-every", "1 day")
     repeat_every = time_str_to_secs(repeat_checks_time)
     last_index = scheduled_md.get("shodan-last-scanned-index") or 0
     last_repeat = scheduled_md.get("shodan-last-repeat")
-    shodan_storage = s.get_storage_create("shodan-scrapped-ips").get()
+
+    shodan_st_list = s.get_storage_create("shodan-scrapped-ips")
+    shodan_storage = []
+    for st in shodan_st_list:
+        shodan_storage.extend(st.get())
+
     ctime = datetime.datetime.now().timestamp()
-    to_check = ip_storage.get()[last_index:]
+    to_check = ip_content[last_index:]
+
+    if debug:
+        rlog("last_index", last_index, "length of data: ", len(ip_content))
+        if last_repeat:
+            rlog(
+                "last_repeat", datetime.datetime.fromtimestamp(last_repeat).isoformat()
+            )
+
+    if last_index >= len(ip_content) and (
+        not last_repeat or ctime - last_repeat >= repeat_every
+    ):
+        rlog("repeating the shodan process after", repeat_checks_time)
+        scheduled_md["shodan-last-repeat"] = ctime
+        last_index = 0
+
+    to_check = ip_content[last_index:]
 
     if debug:
         rlog("last_index", last_index, "length of data: ", len(ip_storage.get()))
@@ -221,7 +244,6 @@ async def scan_shodan_for_ips(event, scheduled_md, matched_storages=[]):
     if last_index >= len(ip_storage.get()) and (
         not last_repeat or ctime - last_repeat >= repeat_every
     ):
-
         rlog("repeating the shodan process after", repeat_checks_time)
         scheduled_md["shodan-last-repeat"] = ctime
         last_index = 0

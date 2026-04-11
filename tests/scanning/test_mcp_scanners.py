@@ -223,6 +223,7 @@ async def test_mcp_interactive_ai_process_todo_notes_happy_path(
     mock_context = create_mock_context_manager(mock_entries)
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -254,6 +255,7 @@ async def test_mcp_interactive_ai_process_todo_notes_empty_entries(
     mock_context = create_mock_context_manager({})
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -293,6 +295,7 @@ async def test_mcp_interactive_ai_process_todo_notes_non_todo_keys_filtered(
     mock_context = create_mock_context_manager(mock_entries)
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -328,6 +331,7 @@ async def test_mcp_interactive_ai_process_todo_notes_interaction_error(
     mock_context = create_mock_context_manager(mock_entries)
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -372,6 +376,7 @@ async def test_mcp_ai_perform_scanning_happy_path(mock_event, mock_scheduled_md)
     mock_file.write = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -405,6 +410,7 @@ async def test_mcp_ai_perform_scanning_empty_entries(mock_event, mock_scheduled_
     mock_context = create_mock_context_manager({})
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -442,6 +448,7 @@ async def test_mcp_ai_perform_scanning_invalid_xml(mock_event, mock_scheduled_md
     mock_file = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -486,6 +493,7 @@ async def test_mcp_ai_perform_scanning_missing_base_url(mock_event, mock_schedul
     mock_context = create_mock_context_manager(mock_entries)
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -531,6 +539,7 @@ async def test_mcp_ai_perform_fuzzing_happy_path(mock_event, mock_scheduled_md):
     mock_file = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -545,7 +554,7 @@ async def test_mcp_ai_perform_fuzzing_happy_path(mock_event, mock_scheduled_md):
         ) as mock_ffuf,
         patch(
             "rcn_web.scanning.mcp_scanners.get_storage_create",
-            return_value=mock_storage,
+            return_value=[mock_storage],
         ),
         patch("rcn_web.scanning.mcp_scanners.global_add_annotation", MagicMock()),
         patch("aiofiles.open") as mock_aiofiles_open,
@@ -570,6 +579,7 @@ async def test_mcp_ai_perform_fuzzing_empty_entries(mock_event, mock_scheduled_m
     mock_context = create_mock_context_manager({})
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -612,6 +622,7 @@ def generate_wordlist():
     mock_file = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -625,7 +636,7 @@ def generate_wordlist():
         ) as mock_ffuf,
         patch(
             "rcn_web.scanning.mcp_scanners.get_storage_create",
-            return_value=mock_storage,
+            return_value=[mock_storage],
         ),
         patch("rcn_web.scanning.mcp_scanners.global_add_annotation", MagicMock()),
         patch("aiofiles.open") as mock_aiofiles_open,
@@ -665,6 +676,7 @@ async def test_mcp_ai_perform_fuzzing_no_wordlists(mock_event, mock_scheduled_md
     mock_file = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,
@@ -708,6 +720,7 @@ async def test_mcp_ai_perform_fuzzing_error_path(mock_event, mock_scheduled_md):
     mock_file = AsyncMock()
 
     with (
+        patch("sys.argv", ["prog", "/tmp"]),
         patch(
             "rcn_web.scanning.mcp_scanners.get_unprocessed_annotations",
             return_value=mock_context,

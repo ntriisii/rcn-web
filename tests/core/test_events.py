@@ -25,6 +25,7 @@ class MockTargetEntry:
 
     def __init__(self):
         self.id = "test-target-id"
+        self.name = "test-target"
         self.target_directory = Path("/tmp/mock_target")
         self.config = {
             "scope": {"wildcards": ["*.example.com"], "urls": ["https://example.com"]}
@@ -79,7 +80,8 @@ async def test_handle_init_target_happy_path():
             "rcn_web.core.events.get_config_urls", return_value=["https://example.com"]
         ),
         patch(
-            "rcn_web.core.events.get_storage_create", return_value=mock_domains_storage
+            "rcn_web.core.events.get_storage_create",
+            return_value=[mock_domains_storage],
         ),
         patch("rcn_web.core.events.storage_automation_md_get_create", return_value={}),
         patch("builtins.open", mock_open()) as mock_file_open,
@@ -219,10 +221,10 @@ async def test_handle_init_target_error_path():
         with pytest.raises(RuntimeError, match="Flow execution failed"):
             await handle_init_target({"event": "test"}, {"run_id": "test-run"})
 
-        # Verify running flag was reset
-        assert mock_target._storage_md.get("init-recon-running") is False
-        # Verify finished flag was NOT set
-        assert mock_target._storage_md.get("init-recon-finished") is None
+    # Verify running flag was reset
+    assert mock_target._storage_md.get("init-recon-running") is False
+    # Verify finished flag was NOT set
+    assert mock_target._storage_md.get("init-recon-finished") is None
 
 
 # --- Tests for real dict entry resolution (new API behavior) ---
@@ -276,7 +278,8 @@ async def test_handle_init_target_plain_dict_entry():
             "rcn_web.core.events.get_config_urls", return_value=["https://example.com"]
         ),
         patch(
-            "rcn_web.core.events.get_storage_create", return_value=mock_domains_storage
+            "rcn_web.core.events.get_storage_create",
+            return_value=[mock_domains_storage],
         ),
         patch("rcn_web.core.events.storage_automation_md_get_create", return_value={}),
         patch("builtins.open", mock_open()) as mock_file_open,
@@ -287,9 +290,9 @@ async def test_handle_init_target_plain_dict_entry():
 
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
 
-        # Verify flags set on the resolved TargetStorage
-        assert storage_md.get("init-recon-finished") is True
-        assert storage_md.get("init-recon-running") is False
+    # Verify flags set on the resolved TargetStorage
+    assert mock_target_obj._storage_md.get("init-recon-finished") is True
+    assert mock_target_obj._storage_md.get("init-recon-running") is False
 
 
 @pytest.mark.asyncio
@@ -311,4 +314,3 @@ async def test_handle_init_target_plain_dict_no_parent():
     ):
         # Should skip gracefully without error
         await handle_init_target({"event": "test"}, {"run_id": "test-run"})
-
