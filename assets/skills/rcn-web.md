@@ -261,7 +261,7 @@ rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[] | {site, u
 
 **Example output:**
 ```
-each line of entry in this storage consists of:
+keys:
 site
 url
 status_code
