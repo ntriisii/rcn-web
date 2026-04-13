@@ -33,16 +33,26 @@ async def mcp_ai_tag_apps_for_scanning(event, scheduled_md):
             return
 
         ai_payload = """I have a list of applications that I need you to analyze and tag for specific scanning and fuzzing tasks.
-        
+
 You need to produce an XML output containing instructions for Nuclei scanning and Fuzzing.
-        
+
+**Available Skills**: You have access to three skills at `~/recon/.opencode/skills/`:
+1. **rcn-interact**: RCN Web reconnaissance platform - use this to browse discovered assets, explore hierarchical recon data, and orchestrate automated security scans. Read `~/recon/.opencode/skills/rcn-interact/SKILL.md` for full details on storage hierarchy, filtering, annotations, and running security tools with `rr`.
+2. **ewp-interact**: Emacs Web Proxy for HTTP flow analysis - use this to inspect captured traffic, compare requests/responses, and extract specific data points from flows. Read `~/recon/.opencode/skills/ewp-interact/SKILL.md` for flow structure, filtering syntax, diff capabilities, and HTTP request sending.
+3. **scheduled-events**: RCN scheduled background tasks - use this for implementing scheduled automation and periodic processing. Read `~/recon/.opencode/skills/scheduled-events/SKILL.md` for `@rcn_event` decorator patterns, unprocessed entries/annotations processing, and cross-storage enrichment.
+
+**When to Use Each Skill**:
+- Use **rcn-interact** when you need to: preview/view storages, annotate findings, run nuclei/ffuf scans via `rr`, explore application data, or filter recon results.
+- Use **ewp-interact** when you need to: analyze HTTP flows captured through the proxy, diff responses between requests, extract tokens/secrets from flows, or send test requests through the proxy.
+- Use **scheduled-events** when you need to: understand how to create periodic automation, process annotations in pipelines, or coordinate tasks with locking patterns.
+
 1. **Nuclei Scanning**:
    - Root tag: `<scanning>`
    - Mandatory inner tag: `<base-url>` (the URL to scan)
    - Inner tag: `<templates>` (comma-separated list of template paths or URLs)
-   
+
    **Template Sources**:
-   a. **Web Search**: Use `google_web_search` to find existing Nuclei templates that match the application's technologies (e.g., specific CMS, framework, or known vulnerability).
+   a. **Web Search**: Search for existing Nuclei templates that match the application's technologies (e.g., specific CMS, framework, or known vulnerability).
    b. **Generation**: If you identify a suspicious behavior or a potential custom vulnerability, GENERATE a Nuclei template yourself.
       - **CRITICAL**: Save any generated template to the `nuclei-template/` directory at the project root.
       - Use `write_file` to save the template (e.g., `nuclei-template/my-custom-cve.yaml`).
@@ -60,7 +70,7 @@ You need to produce an XML output containing instructions for Nuclei scanning an
    - Root tag: `<fuzzing>`
    - Mandatory inner tag: `<base-url>` (the URL to fuzz)
    - Inner tags for wordlists:
-   
+
    **Wordlist Sources**:
    a. **Web Search/Existing**: Search for appropriate wordlists (e.g., SecLists, FuzzDB, PayloadAllTheThings) on GitHub. You can use the raw URL directly in the tag.
    b. **Generation**: Generate a custom wordlist based on the application context.
@@ -88,7 +98,7 @@ def generate_wordlist():
             ai_payload += json.dumps(app, default=str, indent=2)
             ai_payload += "\n-------------------\n"
 
-        ai_payload += "\n**Instructions**: For each application above, analyze its technologies and context, you can view storages from applications to get more context, then generate the appropriate XML tags for scanning and fuzzing as described. Use the provided tools (web search, file writing) to fetch or create the necessary resources."
+        ai_payload += "\n**Instructions**: For each application above, analyze its technologies and context. Use the available skills (rcn-interact, ewp-interact, scheduled-events) to gather more context from storages and captured flows, then generate the appropriate XML tags for scanning and fuzzing as described."
         ai_payload += "\n\n**CRITICAL ACTION**: Use the `add_annotation` tool to persist your tagging."
         ai_payload += "\n- For fuzzing instructions, use `key='tool-fuzzing'` and set `value` to your generated `<fuzzing>...</fuzzing>` XML."
         ai_payload += "\n- For scanning instructions, use `key='tool-scanning'` and set `value` to your generated `<scanning>...</scanning>` XML."
