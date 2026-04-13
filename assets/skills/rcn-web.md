@@ -1,6 +1,6 @@
 ---
 name: rcn-web
-description: Use when the user needs to browse discovered applications, explore hierarchical reconnaissance data, or orchestrate automated security scans (Nuclei/FFUF) on the RCN Web platform.
+description: Use when the user needs to browse discovered recon assets, explore hierarchical reconnaissance data, or orchestrate automated security scans on the RCN Web platform.
 ---
 
 # RCN Web Reconnaissance Platform
@@ -11,31 +11,10 @@ This skill provides complete control over the RCN Web reconnaissance and scannin
 
 The RCN Web platform provides a command-line interface for all interactions. Use only the provided tools and commands—do not attempt to connect directly to any server URLs.
 
-## Core Architecture
-
-### System Organization
-The system organizes data into **Targets**, **Web Applications**, and **Storages**:
-
-- **Target**: A scope or project containing multiple applications
-- **Web Application**: A specific site/host (e.g., `example.com:443`)
-- **Storage**: A named collection of entries, hierarchical using the `::` separator
-
-### Storage Hierarchy
+## Storage Hierarchy
 
 Storages use `::` as a hierarchical separator. Always use `rcn-web-interact <target_name> describe-target` once you start any work to discover available storages and their schemas dynamically.
 
-
-### Flow Data Structure
-a flow is anything that has its ID as flow-id and is a timestamp, make sure to treat them using the ewp-interact tool, as those are related and stored at that project.
-HTTP flows (network traffic) contain:
-- `method` - HTTP method
-- `url` - Full request URL
-- `path` - URL path
-- `request-headers` - MultiDict of request headers
-- `request-body` - Request body
-- `status` - Response status code
-- `response-headers` - MultiDict of response headers
-- `response-body` - Response body
 
 ## Primary Interface: rcn-web-interact
 
@@ -63,11 +42,12 @@ This command should be run FIRST when starting work. It returns (don't rerun if 
 - List of all available storages with entry counts
 - Sample of columns available in each storage
 
+the target_name is the current directory name you're in ie ~/recon/<target_name>
+
 #### Storage Preview (Metadata)
 
 **Preview storage before viewing (use to check available columns):**
 ```bash
-# Note: Use entry['<column_name>'] syntax for all filters
 rcn-web-interact <target_name> preview --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
 ```
 
@@ -94,7 +74,6 @@ rcn-web-interact <target_name> preview --storage "web-apps::js-flows" --filter "
 
 **View entries in any storage:**
 ```bash
-# Note: Use entry['<column_name>'] syntax for all filters
 rcn-web-interact <target_name> view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
 ```
 
@@ -105,23 +84,12 @@ Examples:
 # View applications (generic approach - works on all storages)
 rcn-web-interact <target_name> view --storage "web-apps"
 rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['status_code'] == 200" --limit 100
-rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['technologies'].contains('React')" --page 2 --limit 50
-
-# View links for a specific app
-rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['site'] == 'example.com'"
 
 # Filter for specific patterns
 rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['url'].contains('api/v1')"
 
-
 # Filter for 403 pages
 rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "entry['status'] == 403"
-
-# View nuclei scan results with pagination
-rcn-web-interact <target_name> view --storage "web-apps::nuclei-scanning" --filter "entry['site'] == 'example.com'" --page 1 --limit 20
-
-# View fuzzing results
-rcn-web-interact <target_name> view --storage "web-apps::fuzzing-data" --filter "entry['status'] == 200" --limit 100
 ```
 
 #### Annotations System
@@ -163,29 +131,9 @@ rcn-web-interact <target_name> annotate --storage "web-apps" --entry-id 123 --ca
 rcn-web-interact <target_name> annotate --storage "web-apps::js-flows" --entry-id 101 --category "acp-agent-do" --key "gemini-3-flash" --value "<instruction>Analyze JS for API endpoints</instruction>"
 ```
 
-#### ACP Delegation
-
-**Delegate tasks to background agents:**
-```bash
-rcn-web-interact <target_name> delegate --app <name> --agent <agent_name> --instructions "<text>" --storage <storage_name> [--entry-ids <ids>]
-```
-
-Available agents:
-- `gemini-3-flash` - Fast analysis agent
-- `gemini-3` - Standard analysis agent
-
-Examples:
-```bash
-# Delegate JS analysis
-rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all js-flows for hardcoded credentials and internal staging URLs." --storage "web-apps::js-flows"
-
-# Delegate specific entries
-rcn-web-interact <target_name> delegate --app "example.com" --agent "gemini-3" --instructions "Check these endpoints for IDOR vulnerabilities" --storage "web-apps::app-links" --entry-ids "1,2,3"
-```
-
 #### Running Security Tools with rr
 
-The `rr` command distributes scanning tasks across workers. It runs tools like nuclei, ffuf, and dalfox with chunked wordlists for parallel execution.
+The `rr` command distributes scanning tasks across workers. It runs tools like nuclei, ffuf, and dalfox, etc with chunked wordlists for parallel execution.
 
 **Basic rr syntax:**
 ```bash
@@ -199,10 +147,11 @@ rr <program> <args>
 **Running Nuclei:**
 ```bash
 # Scan targets with nuclei templates
-rr nuclei -u https://example.com/ -t http/exposed-panels/
+rr nuclei -u https://example.com/ -t http/exposed-panels/:l1
 
 # Scan multiple URLs from file
-rr nuclei -l /path/to/urls.txt:l1 -t http/cves/
+rr nuclei -l /path/to/urls.txt:l1 -t http/cves/:l1
+
 ```
 
 nuclei-templates are in /home/ahmed/AllForOne/Templates/
@@ -227,67 +176,6 @@ rcn-web-interact add --storage "web-apps::nuclei-scanning" --app "example.com" -
 # Add fuzzing results
 rcn-web-interact add --storage "web-apps::fuzzing-data" --app "example.com" --data '{"url": "https://example.com/api/v1/users", "status": 200, "length": 1500}'
 ```
-
-**Available Tool Programs:**
-- `nuclei` - Vulnerability scanner
-- `ffuf` - Fuzzing tool
-
-#### Scheduled Functions
-
-Create persistent background automations by creating scheduled functions. The scheduled function consists of two parts: a YAML configuration file and a Python script containing the logic. Both files should be created in the current target's root directory.
-
-**Create a new scheduled function:**
-
-1. Create the YAML configuration file in the project root:
-   ```yaml
-   # my-scanner.yaml
-   name: my_scanner
-   every: 10m
-   require-storage: web-apps
-   min-entries: 1
-   function: py_my_scanner
-   ```
-
-2. Create the Python script in the same directory:
-   ```python
-   # script.py (or another python file in the root directory)
-   from rcn_core.decorators import rcn_event
-   from rcn_core.data_access import get_unprocessed_entries
-   
-   @rcn_event()
-   async def my_scanner(event, scheduled_md):
-       async with get_unprocessed_entries(event["name"], event) as unprocessed:
-           if not unprocessed:
-               return
-           for item_id, item_data in unprocessed.items():
-               entry = item_data['entry']
-               # Process entry
-               print(f"Processing: {entry.get('url')}")
-   ```
-
-**Schedule formats:**
-- `10s` - 10 seconds
-- `10m` - 10 minutes
-- `1h` - 1 hour
-- `1d` - 1 day
-- `10s 10m 10h 10d` - Combined intervals
-
-**Key parameters in YAML:**
-- `name` - Function identifier
-- `every` - Execution interval
-- `require-storage` - Storage to monitor for new entries
-- `min-entries` - Minimum new entries before triggering (optional)
-- `function` - The name of the python function prefixed with `py_` (e.g., `py_my_scanner` refers to `def my_scanner`)
-
-**Multi-storage patterns:**
-```yaml
-name: correlate_data
-require-storage:
-  - web-apps
-  - web-apps::js-flows
-```
-
-This triggers when new entries exist in BOTH storages, providing combinations.
 
 ## Filter Syntax
 
@@ -347,11 +235,31 @@ The filtering system uses a custom python objects that will be translated to sql
 --filter "entry['url'].contains('.js')"
 ```
 
-## Advanced Command Patterns with JQ
+## Advanced Command Patterns
 
-the output of the `rcn-web-interact view` command will always be json list so you can use 
-jq to parse and filter required content to focus on information that is crucial and required.
-### Parse and Filter Output
+The output of `rcn-web-interact view` is a JSON list. Use `jq` for filtering/extraction or `jsonl-to-entries` for human-readable compact views.
+
+### jsonl-to-entries (Recommended for context saving)
+
+Use `jsonl-to-entries` to convert JSONL data into compact ##-separated entry blocks. This saves context tokens compared to raw JSON output. Pipe the JSON list output from `view` through `jq` to convert to JSONL first:
+
+```bash
+rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[]' | jsonl-to-entries
+```
+
+**Examples:**
+```bash
+# View all applications in compact format
+rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[]' | jsonl-to-entries
+
+# View filtered results
+rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['status_code'] == 200" | jq -c '.[]' | jsonl-to-entries
+
+# View specific fields only (saves even more tokens)
+rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[] | {site, url, status_code}' | jsonl-to-entries
+```
+
+### Parse and Filter Output with JQ
 
 **Get applications and extract URLs:**
 ```bash
@@ -375,107 +283,11 @@ rcn-apps | jq -r '.[] | .site' | while read app; do
 done
 ```
 
-
-
-## Common Workflow Patterns
-
-### Pattern 1: Initial Setup - Describe Target
-```bash
-# Always start by describing the target
-rcn-web-interact describe-target
-
-# This shows all available storages and their entry counts
-```
-
-### Pattern 2: Application Discovery
-```bash
-# Use view --storage "web-apps" for all app operations
-rcn-web-interact view --storage "web-apps"
-
-# Filter by technology
-rcn-web-interact view --storage "web-apps" --filter "entry['technologies'].contains('PHP')" --limit 100
-
-# Find unchecked apps
-rcn-web-interact view --storage "web-apps" --filter "entry['app_checked'] == 0" --page 1 --limit 50
-
-# Find apps by domain pattern
-rcn-web-interact view --storage "web-apps" --filter "entry['site'].contains('api')" --limit 20
-```
-
-### Pattern 3: Storage Exploration
-```bash
-# Preview storage to see columns
-rcn-web-interact preview --storage "web-apps::js-flows"
-
-# View with appropriate filters
-rcn-web-interact view --storage "web-apps::js-flows" --filter "entry['url'].contains('.min.js')" --limit 100
-```
-
-### Pattern 4: Targeted Data Retrieval
-```bash
-# Filter for interesting patterns
-rcn-web-interact view --storage "web-apps::app-links" --filter "(entry['url'].contains('api/v1')) & (entry['status'] == 200)" --limit 50
-
-# Find endpoints with specific extensions
-rcn-web-interact view --storage "web-apps::app-links" --filter "((entry['path'].contains('.php')) | (entry['path'].contains('.asp'))) & (entry['status'] == 200)"
-```
-
-### Pattern 5: Security Analysis with Annotations
-```bash
-# Mark findings using annotate command
-rcn-web-interact annotate --storage "web-apps::app-links" --entry-id 456 --category "finding" --key "admin-panel" --value "Found admin panel at /admin"
-
-# Trigger nuclei scan on discovered endpoints
-rcn-web-interact scan --app "example.com" --xml "<scanning><base-url>https://example.com/admin</base-url><templates>http/exposed-panels/admin-panel.yaml</templates></scanning>"
-```
-
-### Pattern 6: Bulk Operations
-```bash
-# Get all unchecked apps and process them
-rcn-web-interact view --storage "web-apps" --filter "entry['app_checked'] == 0" --limit 100 | jq -r '.[].site' | while read site; do
-echo "Processing $site..."
-# Use rcn-web-interact commands to modify state
-rcn-web-interact annotate --storage "web-apps" --entry-id "$site" --category "run" --key "checked" --value "true"
-done
-```
-
-### Pattern 7: Delegation for Deep Analysis
-```bash
-# Delegate JS analysis to background agent
-rcn-web-interact delegate --app "example.com" --agent "gemini-3-flash" --instructions "Analyze all JavaScript files for: 1) Hardcoded API keys/secrets, 2) Internal endpoints/URLs, 3) Source map references, 4) Sensitive configuration data" --storage "web-apps::js-flows"
-```
-
 ## Scripting and Automation
 
-### Shell Script Examples
-
-**Process all applications:**
-```bash
-#!/bin/bash
-rcn-web-interact view --storage "web-apps" --filter "entry['disabled'] == 0" --limit 1000 | jq -r '.[].site' | while read app; do
-  echo "Processing $app..."
-  # Your processing logic here
-done
-```
-
-**Extract all URLs for fuzzing:**
-```bash
-#!/bin/bash
-SITE="example.com"
-rcn-web-interact view --storage "web-apps::app-links" --filter "(entry['site'] == '$SITE') & (entry['status'] == 200)" --limit 1000 | \
-  jq -r '.[] | .url' > urls.txt
-```
-
-**Check for new JS files (using annotation tracking):**
-```bash
-#!/bin/bash
-rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['site'] == 'example.com'" --limit 100 | \
-  jq -r '.[] | .url' | while read url; do
-    echo "JS File: $url"
-done
-```
-
 ### Python Integration
+
+you can always use the skill rcn-scheduled-events to create those.
 
 When working with scheduled functions (use `@rcn_event` decorator):
 
@@ -507,26 +319,3 @@ async def analyze_new_links(event, scheduled_md):
 6. **Delegate heavy tasks** - Use `delegate` for time-consuming analysis
 7. **Chain with jq** - Pipe outputs to `jq` for transformation after server-side filtering
 8. **Check context first** - Always check `rcn-app` or `rcn-marked` for current context
-
-## Available Tools
-
-- `rcn-web-interact`: Core CLI for all RCN Web operations
-- `jq`: JSON processor for filtering output
-
-## Annotation Categories Reference
-
-**Entry Categories:**
-- `potential-vuln` - Potential vulnerabilities
-- `notes` - General observations
-- `run` - Execution parameters
-
-**User Categories:**
-- `notify` - User notifications
-- `finding` - Security findings
-
-**ACP Agent Category:**
-- `acp-agent-do` - Task delegation
-  - Key: Agent name
-  - Value: XML with `<instruction>`, `<repeat>`, `<entry>`
-  
-
