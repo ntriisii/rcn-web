@@ -259,6 +259,25 @@ rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['status
 rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[] | {site, url, status_code}' | jsonl-to-entries
 ```
 
+**Example output:**
+```
+each line of entry in this storage consists of:
+site
+url
+status_code
+-------
+and it will be seperated by ##
+
+example.com
+https://example.com
+200
+##
+test.com
+https://test.com/api
+403
+##
+```
+
 ### Parse and Filter Output with JQ
 
 **Get applications and extract URLs:**
