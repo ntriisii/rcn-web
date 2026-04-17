@@ -165,16 +165,44 @@ rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1
 rr ffuf -u l1:FUZZ -w ~/wordlists/api-endpoints.txt:l2
 ```
 
-**Saving Results to Storages:**
+#### Add Data
 
-After running tools, add findings to the appropriate storage. Data should be added as valid JSON matching the schema of the storage:
-
+**Add new entries to a storage:**
 ```bash
-# Add nuclei results to scanning storage
-rcn-web-interact add --storage "web-apps::nuclei-scanning" --app "example.com" --data '{"name": "CVE-2021-1234", "severity": "high", "url": "https://example.com/admin"}'
+rcn-web-interact <target_name> add --storage <storage_name> [--app-id <id>] --data '<json_data>'
+```
 
-# Add fuzzing results
-rcn-web-interact add --storage "web-apps::fuzzing-data" --app "example.com" --data '{"url": "https://example.com/api/v1/users", "status": 200, "length": 1500}'
+Example:
+```bash
+rcn-web-interact my_target add --storage "web-apps::nuclei-scanning" --data '{"name": "CVE-2021-1234", "severity": "high"}'
+```
+
+#### Update Data
+
+**Update existing entries:**
+```bash
+rcn-web-interact <target_name> update --storage <storage_name> [--ids <id1,id2>] [--filter "<filter>"] --data '<json_data>'
+```
+
+#### Delete Data
+
+**Delete entries from storage:**
+```bash
+rcn-web-interact <target_name> delete --storage <storage_name> [--ids <id1,id2>] [--filter "<filter>"]
+```
+
+#### MCP Actions and Prompts
+
+**List available tools and prompts:**
+```bash
+rcn-web-interact <target_name> list-tools
+rcn-web-interact <target_name> list-prompts
+```
+
+**Execute an action or prompt:**
+```bash
+rcn-web-interact <target_name> action --name <action_name> [--params '<json_params>']
+rcn-web-interact <target_name> prompt --name <prompt_name> [--args '<json_args>']
 ```
 
 ## Filter Syntax
