@@ -65,3 +65,28 @@ curl -X POST http://localhost:8023/restartTarget/<target-name>
 1. Check `rcn_web/core/events.py` for errors.
 2. Ensure the function signature is `async def name(event, scheduled_md)`.
 3. Verify `rcn_automation_data.db` table `delayed_operations` for pending tasks.
+
+---
+
+## 4. DATA FORMAT CONVENTIONS
+
+### Content Negotiation (Accept Header)
+The MCP endpoint `/mcp/view` supports content negotiation via the `Accept` header to provide raw data for automation:
+
+| Endpoint | Accept Header | Output Format | Description |
+|----------|---------------|---------------|-------------|
+| `/view` | `application/json` | **JSONL (Data)** | Returns raw entries as JSON Lines (one object per line). |
+| `/view` | *None / text/plain* | **Text (Formatted)** | Returns human-readable text optimized for LLM consumption. |
+| `/preview`| (Any) | **Text (Formatted)** | Always returns human-readable summary/metadata as text. |
+| `/add` | `application/json` | **JSON** | Add new items to a collection. |
+| `/update` | `application/json` | **JSON** | Update existing items in a collection. |
+| `/delete` | `application/json` | **JSON** | Delete items from a collection. |
+| `/prompt` | `application/json` | **JSON** | Execute a prompt function. |
+| `/action` | `application/json` | **JSON** | Execute an action. |
+| `/tools` | `application/json` | **JSON** | List available tools. |
+| `/prompts` | `application/json` | **JSON** | List available prompts. |
+
+### CLI Usage
+The `rcn-web-interact` CLI tool handles formatting for downstream piping:
+- `rcn-web-interact <target> preview --storage <name>`: Prints human-readable text preview.
+- `rcn-web-interact <target> view --storage <name>`: Prints raw JSONL data (requests `application/json`).

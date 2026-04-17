@@ -58,12 +58,6 @@ def _resolve_storage_impl(
 router = create_mcp_router(storage_resolver=_resolve_storage, prefix="/mcp")
 
 
-@router.get("/test-resolve")
-def test_resolve():
-    st = _resolve_storage("web-apps::app-flows")
-    return {"found": st is not None, "repr": str(st)}
-
-
 @router.post("/describe-target")
 async def describe_target(req: Request):
     """Describe target and return storage preview information."""

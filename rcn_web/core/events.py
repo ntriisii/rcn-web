@@ -13,20 +13,16 @@ from rcn_core.decorators import rcn_event
 def _resolve_target(item):
     """Resolve a dict entry from the targets table to a TargetStorage object."""
     target = item["entry"]
-
-    # Already a rich object (e.g. MockTargetEntry in tests)
-    if hasattr(target, "storage_md_get") and hasattr(target, "name"):
-        return target
-
+    
     # Plain dict — resolve via parent (MultiTargetStorage)
     parent = item.get("parent")
     if parent is None:
         return None
-
+    
     target_name = target.get("name")
     if not target_name:
         return None
-
+    
     return parent.get_target_storage(target_name)
 
 

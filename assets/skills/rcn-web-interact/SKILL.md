@@ -1,5 +1,5 @@
 ---
-name: rcn-web
+name: rcn-web-interact
 description: Use when the user needs to browse discovered recon assets, explore hierarchical reconnaissance data, or orchestrate automated security scans on the RCN Web platform.
 ---
 
@@ -171,10 +171,45 @@ After running tools, add findings to the appropriate storage. Data should be add
 
 ```bash
 # Add nuclei results to scanning storage
-rcn-web-interact add --storage "web-apps::nuclei-scanning" --app "example.com" --data '{"name": "CVE-2021-1234", "severity": "high", "url": "https://example.com/admin"}'
+rcn-web-interact <target_name> storage add --name "web-apps::nuclei-scanning" --app-id <id> --data '{"name": "CVE-2021-1234", "severity": "high", "url": "https://example.com/admin"}'
 
 # Add fuzzing results
-rcn-web-interact add --storage "web-apps::fuzzing-data" --app "example.com" --data '{"url": "https://example.com/api/v1/users", "status": 200, "length": 1500}'
+rcn-web-interact <target_name> storage add --name "web-apps::fuzzing-data" --app-id <id> --data '{"url": "https://example.com/api/v1/users", "status": 200, "length": 1500}'
+```
+
+#### Advanced Storage Manipulation
+
+The `storage` group provides direct CRUD access to any collection.
+
+**Storage Add:**
+```bash
+rcn-web-interact <target_name> storage add --name <storage_name> [--app-id <id>] --data '<json_data>'
+```
+
+**Storage Update:**
+```bash
+rcn-web-interact <target_name> storage update --name <storage_name> [--app-id <id>] --filter "<filter>" --updates '<json_updates>'
+```
+
+**Storage Delete:**
+```bash
+rcn-web-interact <target_name> storage delete --name <storage_name> [--app-id <id>] --filter "<filter>"
+```
+
+**Storage Create (Advanced):**
+```bash
+rcn-web-interact <target_name> storage create --name <storage_name> [--app-id <id>] --keys '<json_keys>' [--indexes '<json_indexes>']
+```
+
+**What are Indexes?**
+Indexes are secondary fields used to speed up data lookup. 
+- **Rule of Thumb:** Always include an index for columns you plan to use for filtering or sorting (e.g., `site`, `status`, `severity`).
+- **Benefit:** Allows the system to find data instantly without scanning every single record in the collection. Especially critical for collections with thousands of entries.
+
+**Example:**
+```bash
+# Create a high-performance storage for JS endpoints
+rcn-web-interact my_target storage create --name "js-endpoints" --keys '["url", "method", "site"]' --indexes '["site", "method"]'
 ```
 
 ## Filter Syntax
