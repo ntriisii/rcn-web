@@ -165,51 +165,44 @@ rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1
 rr ffuf -u l1:FUZZ -w ~/wordlists/api-endpoints.txt:l2
 ```
 
-**Saving Results to Storages:**
+#### Add Data
 
-After running tools, add findings to the appropriate storage. Data should be added as valid JSON matching the schema of the storage:
-
+**Add new entries to a storage:**
 ```bash
-# Add nuclei results to scanning storage
-rcn-web-interact <target_name> storage add --name "web-apps::nuclei-scanning" --app-id <id> --data '{"name": "CVE-2021-1234", "severity": "high", "url": "https://example.com/admin"}'
-
-# Add fuzzing results
-rcn-web-interact <target_name> storage add --name "web-apps::fuzzing-data" --app-id <id> --data '{"url": "https://example.com/api/v1/users", "status": 200, "length": 1500}'
+rcn-web-interact <target_name> add --storage <storage_name> [--app-id <id>] --data '<json_data>'
 ```
 
-#### Advanced Storage Manipulation
-
-The `storage` group provides direct CRUD access to any collection.
-
-**Storage Add:**
+Example:
 ```bash
-rcn-web-interact <target_name> storage add --name <storage_name> [--app-id <id>] --data '<json_data>'
+rcn-web-interact my_target add --storage "web-apps::nuclei-scanning" --data '{"name": "CVE-2021-1234", "severity": "high"}'
 ```
 
-**Storage Update:**
+#### Update Data
+
+**Update existing entries:**
 ```bash
-rcn-web-interact <target_name> storage update --name <storage_name> [--app-id <id>] --filter "<filter>" --updates '<json_updates>'
+rcn-web-interact <target_name> update --storage <storage_name> [--ids <id1,id2>] [--filter "<filter>"] --data '<json_data>'
 ```
 
-**Storage Delete:**
+#### Delete Data
+
+**Delete entries from storage:**
 ```bash
-rcn-web-interact <target_name> storage delete --name <storage_name> [--app-id <id>] --filter "<filter>"
+rcn-web-interact <target_name> delete --storage <storage_name> [--ids <id1,id2>] [--filter "<filter>"]
 ```
 
-**Storage Create (Advanced):**
+#### MCP Actions and Prompts
+
+**List available tools and prompts:**
 ```bash
-rcn-web-interact <target_name> storage create --name <storage_name> [--app-id <id>] --keys '<json_keys>' [--indexes '<json_indexes>']
+rcn-web-interact <target_name> list-tools
+rcn-web-interact <target_name> list-prompts
 ```
 
-**What are Indexes?**
-Indexes are secondary fields used to speed up data lookup. 
-- **Rule of Thumb:** Always include an index for columns you plan to use for filtering or sorting (e.g., `site`, `status`, `severity`).
-- **Benefit:** Allows the system to find data instantly without scanning every single record in the collection. Especially critical for collections with thousands of entries.
-
-**Example:**
+**Execute an action or prompt:**
 ```bash
-# Create a high-performance storage for JS endpoints
-rcn-web-interact my_target storage create --name "js-endpoints" --keys '["url", "method", "site"]' --indexes '["site", "method"]'
+rcn-web-interact <target_name> action --name <action_name> [--params '<json_params>']
+rcn-web-interact <target_name> prompt --name <prompt_name> [--args '<json_args>']
 ```
 
 ## Filter Syntax
