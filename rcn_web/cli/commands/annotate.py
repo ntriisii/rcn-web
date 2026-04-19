@@ -23,6 +23,10 @@ def annotate(ctx, storage, entry_id, category, key, value):
     try:
         resp = requests.post(f"{base_url}/storage/addEntryAnnotation", json=payload)
         resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
+        resp_data = resp.json()
+        if "annotations" in resp_data and resp_data["annotations"]:
+            click.echo("\n".join(str(a.get("annotation_id")) for a in resp_data["annotations"] if "annotation_id" in a))
+        else:
+            click.echo(json.dumps(resp_data, indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

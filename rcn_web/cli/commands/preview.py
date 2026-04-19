@@ -87,7 +87,11 @@ def add(ctx, storage, app_id, data):
     try:
         resp = requests.post(f"{base_url}/mcp/add", json=payload)
         resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
+        resp_data = resp.json()
+        if "added_ids" in resp_data and resp_data["added_ids"]:
+            click.echo("\n".join(map(str, resp_data["added_ids"])))
+        else:
+            click.echo(json.dumps(resp_data, indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
