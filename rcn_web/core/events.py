@@ -14,6 +14,9 @@ def _resolve_target(item):
     """Resolve a dict entry from the targets table to a TargetStorage object."""
     target = item["entry"]
     
+    if hasattr(target, "storage_md_get"):
+        return target
+        
     # Plain dict — resolve via parent (MultiTargetStorage)
     parent = item.get("parent")
     if parent is None:

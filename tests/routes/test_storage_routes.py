@@ -124,6 +124,7 @@ class TestMcpView:
         mock_st = MagicMock()
         mock_st.storage_name = "web-apps::app-links"
         mock_st.get_view_data.return_value = [{"id": "entry-1", "url": "https://example.com/page1"}]
+        mock_st.get_text_view.return_value = "url: https://example.com/page1"
         mock_st.compile_query.return_value = ("1=1", [])
         mock_st.primary_key = "id"
         mock_st.use_main_alias = False

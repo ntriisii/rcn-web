@@ -18,6 +18,7 @@ class TestMCPStandardized:
         mock_storage = MagicMock()
         mock_storage.storage_name = "web-apps"
         mock_storage.get_view_data.return_value = [{"id": 1, "site": "test.com"}]
+        mock_storage.get_text_view.return_value = "site: test.com"
         mock_storage.compile_query.return_value = ("main.id = ?", [1])
         mock_storage.primary_key = "id"
         mock_storage.use_main_alias = True

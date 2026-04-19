@@ -59,7 +59,7 @@ def test_preview_command_uses_target_base_url():
         
         assert result.exit_code == 0
         args, kwargs = mock_post.call_args
-        assert args[0] == "http://localhost:8023/my-target/mcp/preview/generic"
+        assert args[0] == "http://localhost:8023/my-target/mcp/preview"
 
 def test_view_command_uses_target_base_url():
     runner = CliRunner()
@@ -71,5 +71,5 @@ def test_view_command_uses_target_base_url():
         
         assert result.exit_code == 0
         args, kwargs = mock_post.call_args
-        assert args[0] == "http://localhost:8023/my-target/mcp/view/generic"
+        assert args[0] == "http://localhost:8023/my-target/mcp/view"
         assert kwargs["json"]["limit"] == 10
