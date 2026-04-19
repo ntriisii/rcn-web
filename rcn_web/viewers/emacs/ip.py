@@ -92,6 +92,7 @@ def make_ip_tabulated_entries(ip_data, match_groups, **kwargs):
             after_id=None,
             before_id=None,
             sort_desc=True,
+            sort_by=None,
         ):
             res = self.data
             if query_node is not None:

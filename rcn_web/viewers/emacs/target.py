@@ -351,6 +351,7 @@ def elisp_make_target_tabulated_entries(target, match_groups=None, **kwargs):
             after_id=None,
             before_id=None,
             sort_desc=True,
+            sort_by=None,
         ):
             res = self.data
             if query_node is not None:
@@ -725,6 +726,7 @@ def elisp_make_target_tabulated_apps_with_links(target, match_groups=None, **kwa
             after_id=None,
             before_id=None,
             sort_desc=True,
+            sort_by=None,
         ):
             res = self.data
             if query_node is not None:

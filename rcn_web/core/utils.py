@@ -447,6 +447,7 @@ class RemoteFlowsAdapter(StorageMetaData):
         after_id=None,
         before_id=None,
         sort_desc=True,
+        sort_by=None,
     ):
         res = self._cache
         if query_node is not None:
