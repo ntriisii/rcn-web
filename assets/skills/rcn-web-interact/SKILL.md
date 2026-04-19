@@ -74,16 +74,19 @@ rcn-web-interact <target_name> preview --storage "web-apps::js-flows" --filter "
 
 **View entries in any storage:**
 ```bash
-rcn-web-interact <target_name> view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>]
+rcn-web-interact <target_name> view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>] [--sort-by <field>] [--sort-order asc|desc]
 ```
 
-All storages support `--filter`, `--page`, and `--limit` parameters uniformly. The columns returned in the view correspond to the fields inside the `entry` dictionary.
+All storages support `--filter`, `--page`, `--limit`, `--sort-by`, and `--sort-order` parameters uniformly. The columns returned in the view correspond to the fields inside the `entry` dictionary.
 
 Examples:
 ```bash
 # View applications (generic approach - works on all storages)
 rcn-web-interact <target_name> view --storage "web-apps"
 rcn-web-interact <target_name> view --storage "web-apps" --filter "entry['status_code'] == 200" --limit 100
+
+# View applications sorted
+rcn-web-interact <target_name> view --storage "web-apps" --sort-by "status_code" --sort-order desc
 
 # Filter for specific patterns
 rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['url'].contains('api/v1')"

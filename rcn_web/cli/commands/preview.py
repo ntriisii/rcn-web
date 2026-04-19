@@ -33,11 +33,24 @@ def preview(ctx, storage, app_id, sql_filter):
 @click.option("--page", default=1, help="Page number")
 @click.option("--limit", default=1000, help="Results per page")
 @click.option("--filter", "sql_filter", help="SQL filter expression")
+@click.option("--sort-by", help="Field to sort by")
+@click.option(
+    "--sort-order",
+    type=click.Choice(["asc", "desc"]),
+    default="asc",
+    help="Sort order (asc or desc)",
+)
 @click.pass_context
-def view(ctx, storage, app_id, page, limit, sql_filter):
+def view(ctx, storage, app_id, page, limit, sql_filter, sort_by, sort_order):
     """View storage entries with pagination."""
     base_url = ctx.obj["base_url"]
-    payload = {"collection": storage, "page": page, "limit": limit}
+    payload = {
+        "collection": storage,
+        "page": page,
+        "limit": limit,
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+    }
     if app_id:
         payload["parent_id"] = app_id
     if sql_filter:
