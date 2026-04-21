@@ -466,6 +466,12 @@ class RemoteFlowsAdapter(StorageMetaData):
 
         return res[:limit]
 
+    def get(self, *args, **kwargs):
+        return self._cache
+
+    def __len__(self):
+        return len(self._cache)
+
     def get_text_preview(self, filter=None) -> str:
         items = self.get_view_data(limit=5)
         from rcn_core.mcp.utils import format_entries_text

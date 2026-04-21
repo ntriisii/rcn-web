@@ -87,7 +87,17 @@ async def describe_target_action():
                 continue
 
             # Use storage methods for consistent data retrieval
-            count = len(st)
+            count = 0
+            try:
+                count = len(st)
+            except (TypeError, AttributeError):
+                # Fallback for adapters that don't support len()
+                try:
+                    entries = st.get()
+                    count = len(entries)
+                except:
+                    pass
+
             entries = st.get()
             columns = list(entries[0].keys()) if entries else []
             storage_previews[storage_name] = {"count": count, "columns": columns}
