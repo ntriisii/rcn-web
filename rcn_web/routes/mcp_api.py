@@ -55,7 +55,7 @@ def _resolve_storage_impl(
 
 
 @registry.action("describe_target")
-def describe_target_action():
+async def describe_target_action():
     """Describe target and return storage preview information."""
     from rcn_web.core.utils import get_target_storage
 

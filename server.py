@@ -141,6 +141,8 @@ async def request(flow: HTTPFlow):
                 "--port",
                 str(cport),
                 env=os.environ,
+                stderr=sys.stdin,
+                stdout=sys.stdout
             )
 
             started = False
