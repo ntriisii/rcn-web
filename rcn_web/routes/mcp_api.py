@@ -4,7 +4,7 @@ import importlib
 from typing import Optional, Any, Union
 from fastapi import APIRouter
 from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from rcn_core.mcp.registry import registry
 from rcn_core.mcp.api import create_mcp_router
@@ -62,28 +62,46 @@ async def describe_target_action():
     # Use core utility to get storage
     target_storage = get_target_storage()
     if not target_storage:
-        return {"error": "No target storage found"}
+        return "Error: No target storage found"
 
     # Basic target metadata
-    target_info = {
-        "id": getattr(target_storage, "id", None),
-        "site": getattr(target_storage, "site", None),
-    }
+    target_id = getattr(target_storage, "id", None)
+    target_site = getattr(target_storage, "site", None)
 
-    storages_to_preview = [
-        "web-apps",
-        "web-apps::app-links",
-        "web-apps::js-flows",
-        "web-apps::annotations",
-        "flows",
-    ]
+    output = f"Target ID: {target_id}\n"
+    output += f"Target Site: {target_site}\n"
+    output += "\nStorages:\n"
 
-    storage_previews = {}
+    # Query all storages from the database tables
+    storages_to_preview = []
+    try:
+        from rcn_core.storage.connections import get_db_connection
+
+        db_path = target_storage.target_directory / "rcn_automation_data.db"
+        with get_db_connection(db_path=db_path) as conn:
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            for row in cursor.fetchall():
+                table_name = row["name"]
+                if table_name in [
+                    "sqlite_sequence",
+                    "delayed_operations",
+                    "automation_metadata",
+                    "targets",
+                ]:
+                    continue
+                storages_to_preview.append(table_name)
+    except Exception as e:
+        output += f"Warning: Could not list all storages ({str(e)})\n"
+        # Fallback to a basic list if DB query fails
+        storages_to_preview = ["web-apps", "flows"]
+
+    if "flows" not in storages_to_preview:
+        storages_to_preview.append("flows")
+
     for storage_name in storages_to_preview:
         try:
             st = _resolve_storage(storage_name)
             if st is None:
-                storage_previews[storage_name] = {"count": 0, "columns": []}
                 continue
 
             # Use storage methods for consistent data retrieval
@@ -100,15 +118,16 @@ async def describe_target_action():
 
             entries = st.get()
             columns = list(entries[0].keys()) if entries else []
-            storage_previews[storage_name] = {"count": count, "columns": columns}
-        except Exception as e:
-            storage_previews[storage_name] = {
-                "count": 0,
-                "columns": [],
-                "error": str(e),
-            }
 
-    return {"target": target_info, "storages": storage_previews}
+            output += f" - {storage_name}: {count} entries"
+            if columns:
+                output += f" (columns: {', '.join(columns[:10])}{'...' if len(columns) > 10 else ''})"
+            output += "\n"
+
+        except Exception as e:
+            output += f" - {storage_name}: Error ({str(e)})\n"
+
+    return PlainTextResponse(output)
 
 
 # Create router using the standardized MCP routes from rcn-core
