@@ -98,13 +98,13 @@ rcn-web-interact <target_name> storage add --name <storage_name> --data '<json_d
 ```
 - Example: `rcn-web-interact my_target storage add --name "domains" --data '{"domain": "api.example.com", "source": "manual"}'`
 
-**Update existing entries:**
+**Update existing entries matching a filter:**
 ```bash
 rcn-web-interact <target_name> storage update --name <storage_name> --filter "<filter>" --updates '<json_data>' [--app-id <id>]
 ```
 - Example: `rcn-web-interact my_target storage update --name "web-apps" --filter "(entry['site'] == 'old.site')" --updates '{"site": "new.site"}'`
 
-**Delete entries from storage:**
+**Delete entries from storage matching a filter:**
 ```bash
 rcn-web-interact <target_name> storage delete --name <storage_name> --filter "<filter>" [--app-id <id>]
 ```
@@ -120,22 +120,50 @@ rcn-web-interact <target_name> annotate --storage <storage> --entry-id <id> --ca
 ```
 
 **Standard Categories:**
-- `potential-vuln`: `sqli`, `xss`, `idor`, `ssrf`
-- `finding`: `api-key`, `secret`, `endpoint`
-- `notes`: `interesting`, `suspicious`, `check-later`
-- `todo`: `scan`, `analyze`, `verify`
-- `acp-agent-do`: Delegation instructions
 
-Example:
+| Category | Purpose | Example Keys | Example Values |
+|----------|---------|--------------|----------------|
+| `potential-vuln` | Mark potential vulnerabilities | `sqli`, `xss`, `idor`, `ssrf` | Description of the vulnerability |
+| `finding` | Document confirmed findings | `api-key`, `secret`, `endpoint` | Found hardcoded key in file.js |
+| `notes` | General observations | `interesting`, `suspicious`, `check-later` | Notes about the entry |
+| `todo` | Task tracking | `scan`, `analyze`, `verify` | Task description |
+| `acp-agent-do` | Delegate to ACP agent | `<agent-name>` | Instructions for the agent |
+| `notify` | User notifications | `alert`, `info` | Notification message |
+
+**Example:**
 ```bash
 rcn-web-interact <target_name> annotate --storage "web-apps" --entry-id 123 --category "finding" --key "api-key" --value "Found AWS key in main.js"
 ```
 
 #### Running Security Tools with rr
 
-Basic syntax: `rr <program> <args>`
-- **Nuclei**: `rr nuclei -u https://example.com/ -t http/exposed-panels/:l1`
-- **FFUF**: `rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1`
+The `rr` command distributes scanning tasks across workers. It runs tools like nuclei, ffuf, and dalfox, etc with chunked wordlists for parallel execution.
+
+**Basic rr syntax:**
+```bash
+rr <program> <args>
+```
+
+**Chunk notation for distribution:**
+- `:l1`, `:l2` - List chunks for URLs/wordlists
+- `:p1`, `:p2` - Port chunks
+
+**Running Nuclei:**
+```bash
+# Scan targets with nuclei templates
+rr nuclei -u https://example.com/ -t http/exposed-panels/:l1
+
+# Scan multiple URLs from file
+rr nuclei -l /path/to/urls.txt:l1 -t http/cves/:l1
+```
+
+nuclei-templates are in `/home/ahmed/AllForOne/Templates/`
+
+**Running FFUF:**
+```bash
+# Fuzz with wordlist distribution
+rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1
+```
 
 #### MCP Actions and Prompts
 
@@ -155,22 +183,65 @@ The system translates Python-style expressions to SQL.
 
 Example: `--filter "(entry['status_code'] == 200) & (entry['url'].contains('api'))"`
 
-## Advanced Patterns
+## Advanced Command Patterns
 
-**Pipe to JQ and convert to entries for context saving:**
+The output of `rcn-web-interact view` is a JSON list. Use `jq` for filtering/extraction or `jsonl-to-entries` for human-readable compact views.
+
+### jsonl-to-entries (Recommended for context saving)
+
+Use `jsonl-to-entries` to convert JSONL data into compact ##-separated entry blocks. This saves context tokens compared to raw JSON output. Pipe the JSON list output from `view` through `jq` to convert to JSONL first:
+
 ```bash
 rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[]' | jsonl-to-entries
 ```
 
-**Find API endpoints and extract URLs:**
+**Examples:**
 ```bash
-rcn-web-interact view --storage "web-apps::app-links" --filter "entry['path'].contains('/api/')" | jq -r '.[].url'
+# View specific fields only (saves tokens)
+rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[] | {site, url, status_code}' | jsonl-to-entries
+```
+
+### JQ Integration Examples
+
+**Get applications and extract URLs:**
+```bash
+rcn-web-interact view --storage "web-apps" | jq -r '.[].url'
+```
+
+**Extract links and format for testing:**
+```bash
+rcn-web-interact view --storage "web-apps::app-links" --filter "(entry['site'] == 'example.com')" | jq -r '.[] | "\(.status) \(.url)"' | sort -n
+```
+
+## Scripting and Automation
+
+### Python Integration
+
+You can use the skill `rcn-scheduled-events` to create automated scanning or analysis logic. When working with scheduled functions (use `@rcn_event` decorator):
+
+```python
+from rcn_core.decorators import rcn_event
+from rcn_core.data_access import get_unprocessed_entries
+from rcn_web.core.utils import web_match_storage
+
+@rcn_event()
+async def analyze_new_links(event, scheduled_md):
+    scanner_name = event["name"]
+    async with get_unprocessed_entries(scanner_name, event, match_storage_fn=web_match_storage) as unprocessed:
+        if not unprocessed:
+            return
+        for item_id, item_data in unprocessed.items():
+            entry = item_data['entry']
+            url = entry.get('url')
+            # Process the entry
+            print(f"New link: {url}")
 ```
 
 ## Best Practices
 
-1. **Describe First**: Use `describe-target` to find dynamic storages.
-2. **Preview Before View**: Check schema and count with `preview`.
-3. **Server-side Filter**: Use `--filter` instead of `jq` for large datasets.
-4. **Annotate Often**: Use the annotation system to persist findings.
-5. **Chain with jq**: All `view` output is JSON, perfect for `jq` processing.
+1. **Describe First**: Use `describe-target` to find dynamic storages and schemas once you start working.
+2. **Preview Before View**: Check columns and entry count with `preview` to avoid fetching massive datasets.
+3. **Server-side Filter**: Use `--filter` with the mandatory bitwise syntax for efficient querying.
+4. **Annotate Often**: Document confirms vulnerabilities or findings via the annotation system.
+5. **Chain with jq**: All `view` output is JSON, optimized for `jq` processing and automation.
+6. **Check Context**: Use `rcn-app` or `rcn-marked` (when available) to maintain situational awareness.
