@@ -112,7 +112,7 @@ def elisp_make_basic_storage_view(dstorage, *args, **kwargs):
     return {
         "window-config": {
             "window-1": {
-                "buffer-name": "*generic-entries*",
+                "buffer-name": "*entries*",
                 "mode": "tabulated-list-mode",
                 "tabulated-format": tabulated_format,
                 "entries": tabulated_entries,
@@ -121,7 +121,7 @@ def elisp_make_basic_storage_view(dstorage, *args, **kwargs):
                 "view-store": {"basic-data": {"storage-name": dstorage.storage_name}},
             },
             "window-2": {
-                "buffer-name": "*generic-entries-view*",
+                "buffer-name": "*entries-view*",
                 "mode": "org-mode",
                 "entries": {},
             },

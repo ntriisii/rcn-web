@@ -9,7 +9,7 @@ import requests
 @click.option("--filter", "sql_filter", help="SQL filter expression")
 @click.pass_context
 def preview(ctx, storage, app_id, sql_filter):
-    """Preview storage before viewing."""
+    """Preview storage."""
     base_url = ctx.obj["base_url"]
     payload = {"collection": storage}
     if app_id:
@@ -42,7 +42,7 @@ def preview(ctx, storage, app_id, sql_filter):
 )
 @click.pass_context
 def view(ctx, storage, app_id, page, limit, sql_filter, sort_by, sort_order):
-    """View storage entries with pagination."""
+    """View storage entries."""
     base_url = ctx.obj["base_url"]
     payload = {
         "collection": storage,
