@@ -3,7 +3,12 @@ import json
 import requests
 
 
-@click.command()
+@click.group(help="Advanced storage manipulation.")
+def storage_group():
+    pass
+
+
+@storage_group.command(name="preview")
 @click.option("--storage", required=True, help="Storage name")
 @click.option("--app-id", type=int, help="Application ID")
 @click.option("--filter", "sql_filter", help="SQL filter expression")
@@ -27,7 +32,7 @@ def preview(ctx, storage, app_id, sql_filter):
         click.echo(f"Error: {e}", err=True)
 
 
-@click.command()
+@storage_group.command(name="view")
 @click.option("--storage", required=True, help="Storage name")
 @click.option("--app-id", type=int, help="Application ID")
 @click.option("--page", default=1, help="Page number")
@@ -66,12 +71,12 @@ def view(ctx, storage, app_id, page, limit, sql_filter, sort_by, sort_order):
         click.echo(f"Error: {e}", err=True)
 
 
-@click.command()
-@click.option("--storage", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID")
+@storage_group.command(name="add")
+@click.option("--name", required=True, help="Storage name")
+@click.option("--app-id", type=int, help="Application ID (Parent)")
 @click.option("--data", required=True, help="JSON data to add")
 @click.pass_context
-def add(ctx, storage, app_id, data):
+def add(ctx, name, app_id, data):
     """Add new items to a collection."""
     base_url = ctx.obj["base_url"]
     try:
@@ -80,7 +85,7 @@ def add(ctx, storage, app_id, data):
         click.echo("Error: Invalid JSON data", err=True)
         return
 
-    payload = {"collection": storage, "data": json_data}
+    payload = {"collection": name, "data": json_data}
     if app_id:
         payload["parent_id"] = app_id
 
@@ -96,28 +101,24 @@ def add(ctx, storage, app_id, data):
         click.echo(f"Error: {e}", err=True)
 
 
-@click.command()
-@click.option("--storage", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID")
-@click.option("--ids", help="Comma separated item IDs")
-@click.option("--filter", "sql_filter", help="SQL filter expression")
-@click.option("--data", required=True, help="JSON data for update")
+@storage_group.command(name="update")
+@click.option("--name", required=True, help="Storage name")
+@click.option("--app-id", type=int, help="Application ID (Parent)")
+@click.option("--filter", "sql_filter", required=True, help="SQL filter expression")
+@click.option("--updates", required=True, help="JSON data for update")
 @click.pass_context
-def update(ctx, storage, app_id, ids, sql_filter, data):
+def update(ctx, name, app_id, sql_filter, updates):
     """Update existing items in a collection."""
     base_url = ctx.obj["base_url"]
     try:
-        json_data = json.loads(data)
+        json_data = json.loads(updates)
     except json.JSONDecodeError:
         click.echo("Error: Invalid JSON data", err=True)
         return
 
-    item_ids = [int(i.strip()) for i in ids.split(",")] if ids else None
-
     payload = {
-        "collection": storage,
+        "collection": name,
         "data": json_data,
-        "item_ids": item_ids,
         "filter": sql_filter,
     }
     if app_id:
@@ -131,18 +132,15 @@ def update(ctx, storage, app_id, ids, sql_filter, data):
         click.echo(f"Error: {e}", err=True)
 
 
-@click.command()
-@click.option("--storage", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID")
-@click.option("--ids", help="Comma separated item IDs")
-@click.option("--filter", "sql_filter", help="SQL filter expression")
+@storage_group.command(name="delete")
+@click.option("--name", required=True, help="Storage name")
+@click.option("--app-id", type=int, help="Application ID (Parent)")
+@click.option("--filter", "sql_filter", required=True, help="SQL filter expression")
 @click.pass_context
-def delete(ctx, storage, app_id, ids, sql_filter):
+def delete(ctx, name, app_id, sql_filter):
     """Delete items from a collection."""
     base_url = ctx.obj["base_url"]
-    item_ids = [int(i.strip()) for i in ids.split(",")] if ids else None
-
-    payload = {"collection": storage, "item_ids": item_ids, "filter": sql_filter}
+    payload = {"collection": name, "filter": sql_filter}
     if app_id:
         payload["parent_id"] = app_id
 

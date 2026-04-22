@@ -18,7 +18,7 @@ Storages use `::` as a hierarchical separator. Always use `rcn-web-interact <tar
 
 ## Primary Interface: rcn-web-interact
 
-The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions.
+The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions. Note that this tool is for **data management and interaction**; for tool execution, use the `rr` command (see `rr-ops` skill).
 
 ### Arguments
 
@@ -240,8 +240,11 @@ async def analyze_new_links(event, scheduled_md):
 ## Best Practices
 
 1. **Describe First**: Use `describe-target` to find dynamic storages and schemas once you start working.
-2. **Preview Before View**: Check columns and entry count with `preview` to avoid fetching massive datasets.
-3. **Server-side Filter**: Use `--filter` with the mandatory bitwise syntax for efficient querying.
-4. **Annotate Often**: Document confirms vulnerabilities or findings via the annotation system.
-5. **Chain with jq**: All `view` output is JSON, optimized for `jq` processing and automation.
-6. **Check Context**: Use `rcn-app` or `rcn-marked` (when available) to maintain situational awareness.
+2. **Remote Execution**: Always run scanning/fuzzing tools through `rr` (see `rr-ops` skill).
+3. **Manual Ingestion**: Manually ingest tool results into storage using `storage add` after a `rr` task completes.
+4. **Tool Installation**: Prefer prebuilt binaries > `pipx` > `npx` for new tools.
+5. **Preview Before View**: Check columns and entry count with `preview` to avoid fetching massive datasets.
+6. **Server-side Filter**: Use `--filter` with the mandatory bitwise syntax for efficient querying.
+7. **Annotate Often**: Document confirms vulnerabilities or findings via the annotation system.
+8. **Chain with jq**: All `view` output is JSON, optimized for `jq` processing and automation.
+9. **Check Context**: Use `rcn-app` or `rcn-marked` (when available) to maintain situational awareness.

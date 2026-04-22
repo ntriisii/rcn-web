@@ -15,22 +15,18 @@ def cli(ctx, target, base_url):
     ctx.obj["base_url"] = base_url
 
 
-from .commands import storage, annotate, delegate, scan, describe
+from .commands import storage, annotate, delegate, describe
 
 
+cli.add_command(storage.storage_group, name="storage")
 cli.add_command(storage.preview)
 cli.add_command(storage.view)
-cli.add_command(storage.add)
-cli.add_command(storage.update)
-cli.add_command(storage.delete)
 cli.add_command(storage.prompt)
 cli.add_command(storage.action)
 cli.add_command(storage.list_tools)
 cli.add_command(storage.list_prompts)
 cli.add_command(annotate.annotate)
 cli.add_command(delegate.delegate)
-cli.add_command(scan.scan)
-cli.add_command(scan.fuzz)
 cli.add_command(describe.describe, name="describe-target")
 
 
