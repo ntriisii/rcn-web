@@ -55,11 +55,34 @@ Use `---<param> <value>` (triple-dash) to pass configuration parameters to the r
 rr nuclei -l targets.txt:l1 -t cves/ ---chunk-length 100 ---remote-only
 ```
 
-## 3. Tool Installation Preferences
-When a tool is not available on the remote nodes, follow this order of preference for installation:
-1. **Prebuilt Binaries**: The primary and most efficient choice.
-2. **Pipx (Python)**: Use `pipx install <package_name>`.
-3. **Npx (Node.js)**: Use `npx <package_name>`.
+## 3. Tool Installation & Custom Scripts
+The `rr` command automatically checks `~/.config/tool-install.yaml` to fetch installation scripts for specific programs.
+
+### Manual Installation Script
+You can explicitly provide an installation script or setup commands using the `---install-script` parameter. This is useful for custom tools or one-off setups on remote nodes.
+
+| Parameter | Description |
+|-----------|-------------|
+| `---install-script` | Shell script/commands to run on the remote node before tool execution |
+
+**Example with custom installation:**
+```bash
+rr my-custom-tool -args ---install-script "wget https://example.com/tool && chmod +x tool && mv tool ~/.remote_recon/bin/"
+```
+
+### Pre-defined Tools
+If the program name matches a key in `~/.config/tool-install.yaml`, `rr` will use the pre-defined script automatically.
+
+| Tool | Installation Logic (Summary) |
+|------|-----------------------------|
+| `xsstrike` | `pipx install xsstrike` |
+| `dalfox` | Wget binary and move to bin |
+| `bbot` | `pipx install bbot` |
+| `kr` | Wget kiterunner binary |
+| `x8` | Wget and gunzip binary |
+| `arjun` | `pipx install arjun` |
+| `sqlmap` | `pipx install sqlmap` |
+| `xss-scan` | Custom bash function wrapper for xsstrike |
 
 ## 4. Manual Scanning Workflow
 The system relies on a manual execution and ingestion cycle:
