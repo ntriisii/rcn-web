@@ -32,7 +32,28 @@ rr ffuf -u http://HOST/FUZZ -w wordlist.txt:l1
 ```
 
 ### Remote Task Parameters
-Use `---<param> <value>` to pass specific configuration parameters to the remote task handler if needed.
+Use `---<param> <value>` (triple-dash) to pass configuration parameters to the remote task handler.
+
+| Parameter | Description |
+|-----------|-------------|
+| `---task-name` | Name assigned to the remote task |
+| `---local-only` | Only run the task on localhost |
+| `---remote-only` | Don't run the task on localhost (remote nodes only) |
+| `---no-distribute` | Run the task on only one host node (disables chunking) |
+| `---chunks-count` | Explicitly set the number of chunks to create |
+| `---chunk-length` | Number of items per chunk |
+| `---min-chunk-length` | Minimum items per chunk (prevents creating tiny chunks) |
+| `---chunks-per-host` | Number of concurrent chunks per host (default: 2) |
+| `---serve-chunks-count` | Limit the total number of chunks to serve |
+| `---begin` | Start index for processing the input list |
+| `---timeout` | Task timeout in seconds |
+| `---debug` | Enable debug mode for the task |
+| `---host` | Target a specific host for execution |
+
+**Example with parameters:**
+```bash
+rr nuclei -l targets.txt:l1 -t cves/ ---chunk-length 100 ---remote-only
+```
 
 ## 3. Tool Installation Preferences
 When a tool is not available on the remote nodes, follow this order of preference for installation:
