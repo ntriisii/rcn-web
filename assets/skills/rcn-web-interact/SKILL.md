@@ -1,6 +1,6 @@
 ---
 name: rcn-web-interact
-description: Use when the user needs to browse discovered recon assets, explore hierarchical reconnaissance data, or orchestrate automated security scans on the RCN Web platform.
+description: Use when the user needs to browse discovered recon assets, explore hierarchical reconnaissance data, or orchestrate automated security scans on the RCN Web platform, you must load the rcn-storage-ops skill with it.
 ---
 
 # RCN Web Reconnaissance Platform

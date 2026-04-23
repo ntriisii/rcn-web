@@ -1,12 +1,7 @@
 import click
 import json
 import requests
-from rcn_core.cli.shared import (
-    storage_group, 
-    storage_preview as preview, 
-    storage_view as view,
-    storage_annotate as annotate
-)
+from rcn_core.cli.shared import storage_group
 
 @click.command()
 @click.option("--name", required=True, help="Prompt name")
@@ -41,5 +36,3 @@ def action(ctx, name, params):
         click.echo(json.dumps(resp.json(), indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
-
-
