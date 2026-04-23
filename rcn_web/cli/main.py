@@ -32,9 +32,6 @@ from .commands import storage, delegate, describe
 
 
 cli.add_command(storage.storage_group, name="storage")
-cli.add_command(storage.preview)
-cli.add_command(storage.view)
-cli.add_command(storage.annotate)
 cli.add_command(storage.prompt)
 cli.add_command(storage.action)
 cli.add_command(delegate.delegate)

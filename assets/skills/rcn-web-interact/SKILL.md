@@ -44,7 +44,7 @@ Every annotation requires: **Category**, **Key**, and **Value**.
 
 **Add an annotation to an entry:**
 ```bash
-rcn-web-interact annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
+rcn-web-interact storage annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
 ```
 
 **Standard Categories:** `potential-vuln`, `finding`, `notes`, `todo`, `acp-agent-do`, `notify`.
