@@ -1,156 +1,12 @@
 import click
 import json
 import requests
-
-
-@click.group(help="Advanced storage manipulation.")
-def storage_group():
-    pass
-
-
-@storage_group.command(name="preview")
-@click.option("--storage", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID")
-@click.option("--filter", "sql_filter", help="SQL filter expression")
-@click.pass_context
-def preview(ctx, storage, app_id, sql_filter):
-    """Preview storage."""
-    base_url = ctx.obj["base_url"]
-    payload = {"collection": storage}
-    if app_id:
-        payload["parent_id"] = app_id
-    if sql_filter:
-        payload["filter"] = sql_filter
-    try:
-        resp = requests.post(
-            f"{base_url}/mcp/preview",
-            json=payload,
-        )
-        resp.raise_for_status()
-        click.echo(resp.text)
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-
-
-@storage_group.command(name="view")
-@click.option("--storage", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID")
-@click.option("--page", default=1, help="Page number")
-@click.option("--limit", default=1000, help="Results per page")
-@click.option("--filter", "sql_filter", help="SQL filter expression")
-@click.option("--sort-by", help="Field to sort by")
-@click.option(
-    "--sort-order",
-    type=click.Choice(["asc", "desc"]),
-    default="asc",
-    help="Sort order (asc or desc)",
+from rcn_core.cli.shared import (
+    storage_group, 
+    storage_preview as preview, 
+    storage_view as view,
+    storage_annotate as annotate
 )
-@click.pass_context
-def view(ctx, storage, app_id, page, limit, sql_filter, sort_by, sort_order):
-    """View storage entries."""
-    base_url = ctx.obj["base_url"]
-    payload = {
-        "collection": storage,
-        "page": page,
-        "limit": limit,
-        "sort_by": sort_by,
-        "sort_order": sort_order,
-    }
-    if app_id:
-        payload["parent_id"] = app_id
-    if sql_filter:
-        payload["filter"] = sql_filter
-    try:
-        resp = requests.post(
-            f"{base_url}/mcp/view",
-            json=payload,
-        )
-        resp.raise_for_status()
-        click.echo(resp.text)
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-
-
-@storage_group.command(name="add")
-@click.option("--name", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID (Parent)")
-@click.option("--data", required=True, help="JSON data to add")
-@click.pass_context
-def add(ctx, name, app_id, data):
-    """Add new items to a collection."""
-    base_url = ctx.obj["base_url"]
-    try:
-        json_data = json.loads(data)
-    except json.JSONDecodeError:
-        click.echo("Error: Invalid JSON data", err=True)
-        return
-
-    payload = {"collection": name, "data": json_data}
-    if app_id:
-        payload["parent_id"] = app_id
-
-    try:
-        resp = requests.post(f"{base_url}/mcp/add", json=payload)
-        resp.raise_for_status()
-        resp_data = resp.json()
-        if "added_ids" in resp_data and resp_data["added_ids"]:
-            click.echo("\n".join(map(str, resp_data["added_ids"])))
-        else:
-            click.echo(json.dumps(resp_data, indent=2))
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-
-
-@storage_group.command(name="update")
-@click.option("--name", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID (Parent)")
-@click.option("--filter", "sql_filter", required=True, help="SQL filter expression")
-@click.option("--updates", required=True, help="JSON data for update")
-@click.pass_context
-def update(ctx, name, app_id, sql_filter, updates):
-    """Update existing items in a collection."""
-    base_url = ctx.obj["base_url"]
-    try:
-        json_data = json.loads(updates)
-    except json.JSONDecodeError:
-        click.echo("Error: Invalid JSON data", err=True)
-        return
-
-    payload = {
-        "collection": name,
-        "data": json_data,
-        "filter": sql_filter,
-    }
-    if app_id:
-        payload["parent_id"] = app_id
-
-    try:
-        resp = requests.post(f"{base_url}/mcp/update", json=payload)
-        resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-
-
-@storage_group.command(name="delete")
-@click.option("--name", required=True, help="Storage name")
-@click.option("--app-id", type=int, help="Application ID (Parent)")
-@click.option("--filter", "sql_filter", required=True, help="SQL filter expression")
-@click.pass_context
-def delete(ctx, name, app_id, sql_filter):
-    """Delete items from a collection."""
-    base_url = ctx.obj["base_url"]
-    payload = {"collection": name, "filter": sql_filter}
-    if app_id:
-        payload["parent_id"] = app_id
-
-    try:
-        resp = requests.post(f"{base_url}/mcp/delete", json=payload)
-        resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-
 
 @click.command()
 @click.option("--name", required=True, help="Prompt name")
@@ -169,7 +25,6 @@ def prompt(ctx, name, args):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
-
 @click.command()
 @click.option("--name", required=True, help="Action name")
 @click.option("--params", help="JSON parameters for the action")
@@ -187,7 +42,6 @@ def action(ctx, name, params):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
-
 @click.command()
 @click.pass_context
 def list_tools(ctx):
@@ -199,7 +53,6 @@ def list_tools(ctx):
         click.echo(json.dumps(resp.json(), indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
-
 
 @click.command()
 @click.pass_context
