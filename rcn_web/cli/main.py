@@ -37,8 +37,6 @@ cli.add_command(storage.view)
 cli.add_command(storage.annotate)
 cli.add_command(storage.prompt)
 cli.add_command(storage.action)
-cli.add_command(storage.list_tools)
-cli.add_command(storage.list_prompts)
 cli.add_command(delegate.delegate)
 cli.add_command(describe.describe, name="describe-target")
 

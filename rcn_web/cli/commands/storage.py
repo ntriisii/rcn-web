@@ -42,26 +42,4 @@ def action(ctx, name, params):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
-@click.command()
-@click.pass_context
-def list_tools(ctx):
-    """List available tools."""
-    base_url = ctx.obj["base_url"]
-    try:
-        resp = requests.get(f"{base_url}/mcp/tools")
-        resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
 
-@click.command()
-@click.pass_context
-def list_prompts(ctx):
-    """List available prompts."""
-    base_url = ctx.obj["base_url"]
-    try:
-        resp = requests.get(f"{base_url}/mcp/prompts")
-        resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
