@@ -13,16 +13,14 @@ The RCN Web platform provides a command-line interface for all interactions. Use
 
 ## Storage Hierarchy
 
-Storages use `::` as a hierarchical separator. Always use `rcn-web-interact <target_name> describe-target` once you start any work to discover available storages and their schemas dynamically.
+Storages use `::` as a hierarchical separator. Always use `rcn-web-interact describe-target` once you start any work to discover available storages and their schemas dynamically.
 
 
 ## Primary Interface: rcn-web-interact
 
 The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions. Note that this tool is for **data management and interaction**; for tool execution, use the `rr` command (see `rr-ops` skill).
 
-### Arguments
-
-- `TARGET`: Target name. This is a mandatory positional argument used to route requests to the target-specific service.
+The tool automatically resolves the target context based on the current environment (e.g., from the current working directory). You do **NOT** need to provide a target argument.
 
 ### Command Reference
 
@@ -30,7 +28,7 @@ The main CLI tool is `rcn-web-interact`. Use this for ALL server interactions. N
 
 **Describe the target and list all available storages:**
 ```bash
-rcn-web-interact <target_name> describe-target
+rcn-web-interact describe-target
 ```
 
 This command should be run FIRST when starting work. It returns:
@@ -38,25 +36,23 @@ This command should be run FIRST when starting work. It returns:
 - List of all available storages with entry counts
 - Sample of columns available in each storage
 
-The target_name is the current directory name you're in ie `~/recon/<target_name>`.
-
 #### Storage Preview (Metadata)
 
 **Preview storage before viewing (use to check available columns):**
 ```bash
-rcn-web-interact <target_name> preview --storage <storage_name> [--filter "<filter>"] [--app-id <id>]
+rcn-web-interact preview --storage <storage_name> [--filter "<filter>"] [--app-id <id>]
 ```
 
 Examples:
 ```bash
 # Preview web-apps storage (list all applications)
-rcn-web-interact my_target preview --storage "web-apps"
+rcn-web-interact preview --storage "web-apps"
 
 # Preview with filter (use (entry['<column>'] == value) syntax)
-rcn-web-interact <target_name> preview --storage "web-apps" --filter "(entry['status_code'] == 200)"
+rcn-web-interact preview --storage "web-apps" --filter "(entry['status_code'] == 200)"
 
 # Preview app-specific sub-storage
-rcn-web-interact <target_name> preview --storage "web-apps::js-flows" --app-id 123
+rcn-web-interact preview --storage "web-apps::js-flows" --app-id 123
 ```
 
 **Preview shows:**
@@ -69,46 +65,46 @@ rcn-web-interact <target_name> preview --storage "web-apps::js-flows" --app-id 1
 
 **View entries in any storage:**
 ```bash
-rcn-web-interact <target_name> view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>] [--sort-by <field>] [--sort-order asc|desc]
+rcn-web-interact view --storage <storage_name> [--filter "<filter>"] [--page <n>] [--limit <m>] [--sort-by <field>] [--sort-order asc|desc]
 ```
 
 Examples:
 ```bash
 # View all applications (JSON array output)
-rcn-web-interact <target_name> view --storage "web-apps"
+rcn-web-interact view --storage "web-apps"
 
 # View with limit and pagination
-rcn-web-interact <target_name> view --storage "web-apps" --limit 100 --page 2
+rcn-web-interact view --storage "web-apps" --limit 100 --page 2
 
 # View applications sorted
-rcn-web-interact <target_name> view --storage "web-apps" --sort-by "status_code" --sort-order desc
+rcn-web-interact view --storage "web-apps" --sort-by "status_code" --sort-order desc
 
 # Filter for specific patterns using bitwise logic
-rcn-web-interact <target_name> view --storage "web-apps::js-flows" --filter "entry['url'].contains('api/v1')"
+rcn-web-interact view --storage "web-apps::js-flows" --filter "entry['url'].contains('api/v1')"
 
 # Complex filter (Note REQUIRED parentheses)
-rcn-web-interact <target_name> view --storage "web-apps::app-links" --filter "(entry['status'] == 403) & (entry['path'].contains('admin'))"
+rcn-web-interact view --storage "web-apps::app-links" --filter "(entry['status'] == 403) & (entry['path'].contains('admin'))"
 ```
 
 #### Storage CRUD Operations
 
 **Add new entries to a storage:**
 ```bash
-rcn-web-interact <target_name> storage add --name <storage_name> --data '<json_data>' [--app-id <id>]
+rcn-web-interact storage add --name <storage_name> --data '<json_data>' [--app-id <id>]
 ```
-- Example: `rcn-web-interact my_target storage add --name "domains" --data '{"domain": "api.example.com", "source": "manual"}'`
+- Example: `rcn-web-interact storage add --name "domains" --data '{"domain": "api.example.com", "source": "manual"}'`
 
 **Update existing entries matching a filter:**
 ```bash
-rcn-web-interact <target_name> storage update --name <storage_name> --filter "<filter>" --updates '<json_data>' [--app-id <id>]
+rcn-web-interact storage update --name <storage_name> --filter "<filter>" --updates '<json_data>' [--app-id <id>]
 ```
-- Example: `rcn-web-interact my_target storage update --name "web-apps" --filter "(entry['site'] == 'old.site')" --updates '{"site": "new.site"}'`
+- Example: `rcn-web-interact storage update --name "web-apps" --filter "(entry['site'] == 'old.site')" --updates '{"site": "new.site"}'`
 
 **Delete entries from storage matching a filter:**
 ```bash
-rcn-web-interact <target_name> storage delete --name <storage_name> --filter "<filter>" [--app-id <id>]
+rcn-web-interact storage delete --name <storage_name> --filter "<filter>" [--app-id <id>]
 ```
-- Example: `rcn-web-interact my_target storage delete --name "web-apps" --filter "(entry['status_code'] == 404)"`
+- Example: `rcn-web-interact storage delete --name "web-apps" --filter "(entry['status_code'] == 404)"`
 
 #### Annotations System
 
@@ -116,7 +112,7 @@ Every annotation requires: **Category**, **Key**, and **Value**.
 
 **Add an annotation to an entry:**
 ```bash
-rcn-web-interact <target_name> annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
+rcn-web-interact annotate --storage <storage> --entry-id <id> --category <cat> --key <key> --value <val>
 ```
 
 **Standard Categories:**
@@ -132,7 +128,7 @@ rcn-web-interact <target_name> annotate --storage <storage> --entry-id <id> --ca
 
 **Example:**
 ```bash
-rcn-web-interact <target_name> annotate --storage "web-apps" --entry-id 123 --category "finding" --key "api-key" --value "Found AWS key in main.js"
+rcn-web-interact annotate --storage "web-apps" --entry-id 123 --category "finding" --key "api-key" --value "Found AWS key in main.js"
 ```
 
 #### Running Security Tools with rr
@@ -167,9 +163,9 @@ rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1
 
 #### MCP Actions and Prompts
 
-- **List tools/prompts**: `rcn-web-interact <target> list-tools` or `list-prompts`
-- **Execute Action**: `rcn-web-interact <target> action --name <name> [--params '<json>']`
-- **Execute Prompt**: `rcn-web-interact <target> prompt --name <name> [--args '<json>']`
+- **List tools/prompts**: `rcn-web-interact list-tools` or `list-prompts`
+- **Execute Action**: `rcn-web-interact action --name <name> [--params '<json>']`
+- **Execute Prompt**: `rcn-web-interact prompt --name <name> [--args '<json>']`
 
 ## Filter Syntax (CRITICAL)
 
@@ -192,13 +188,13 @@ The output of `rcn-web-interact view` is a JSON list. Use `jq` for filtering/ext
 Use `jsonl-to-entries` to convert JSONL data into compact ##-separated entry blocks. This saves context tokens compared to raw JSON output. Pipe the JSON list output from `view` through `jq` to convert to JSONL first:
 
 ```bash
-rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[]' | jsonl-to-entries
+rcn-web-interact view --storage "web-apps" | jq -c '.[]' | jsonl-to-entries
 ```
 
 **Examples:**
 ```bash
 # View specific fields only (saves tokens)
-rcn-web-interact <target_name> view --storage "web-apps" | jq -c '.[] | {site, url, status_code}' | jsonl-to-entries
+rcn-web-interact view --storage "web-apps" | jq -c '.[] | {site, url, status_code}' | jsonl-to-entries
 ```
 
 ### JQ Integration Examples
