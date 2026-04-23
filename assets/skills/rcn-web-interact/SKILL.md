@@ -19,7 +19,7 @@ All storage operations (preview, view, add, update, delete, annotate) use the st
 
 Example:
 ```bash
-rcn-web-interact storage view --name "web-apps"
+rcn-web-interact storage view --storage "web-apps"
 ```
 
 See the **rcn-storage-ops** skill for detailed filter syntax and command options.
