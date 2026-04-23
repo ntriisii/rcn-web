@@ -4,13 +4,28 @@ import os
 RCN_SERVER_URL = os.environ.get("RCN_WEB_URL", "http://localhost:8023")
 
 
+def get_default_target():
+    """Determine the default target from .env or current directory."""
+    # 1. Try .env file
+    if os.path.exists(".env"):
+        with open(".env") as f:
+            for line in f:
+                if line.startswith("TARGET="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+
+    # 2. Fallback to current directory name
+    return os.path.basename(os.getcwd())
+
+
 @click.group()
-@click.argument("target")
+@click.argument("target", required=False, default=get_default_target)
 @click.option("--base-url", default=RCN_SERVER_URL, help="RCN server URL")
 @click.pass_context
 def cli(ctx, target, base_url):
     """RCN Web CLI tool."""
     ctx.ensure_object(dict)
+    if not target:
+        target = get_default_target()
     base_url = f"{base_url.rstrip('/')}/{target}"
     ctx.obj["base_url"] = base_url
 
