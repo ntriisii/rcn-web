@@ -12,6 +12,9 @@ def describe(ctx):
     try:
         resp = requests.post(f"{base_url}/mcp/action", json=payload)
         resp.raise_for_status()
-        click.echo(json.dumps(resp.json(), indent=2))
+        if "application/json" in resp.headers.get("Content-Type", ""):
+            click.echo(json.dumps(resp.json(), indent=2))
+        else:
+            click.echo(resp.text)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

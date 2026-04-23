@@ -68,14 +68,6 @@ rr nuclei -u https://example.com/ -t http/exposed-panels/:l1
 rr ffuf -u https://example.com/FUZZ:FUZZ -w ~/wordlists/common.txt:l1
 ```
 
-### MCP Actions and Prompts
-
-- **List tools/prompts**: `rcn-web-interact list-tools` or `list-prompts`
-- **Execute Action**: `rcn-web-interact action --name <name> [--params '<json>']`
-- **Execute Prompt**: `rcn-web-interact prompt --name <name> [--args '<json>']`
-
-## Best Practices
-
 1. **Describe First**: Use `describe-target` to find dynamic storages and schemas.
 2. **Remote Execution**: Always run scanning/fuzzing tools through `rr` (see `rr-ops` skill).
 3. **Manual Ingestion**: Manually ingest tool results into storage using `storage add` after a `rr` task completes.
