@@ -160,31 +160,6 @@ async def add_gau_collected_data(request: Request) -> JSONResponse:
 #################################
 # configs for applications
 #################################
-@router.post("/addAnnotation")
-async def add_annotation(request: Request) -> JSONResponse:
-    from rcn_core.storage.bases import add_annotation as global_add_annotation
-
-    content = await request.json()
-    site = content.get("site")
-    entry_id = content.get("entry_id")
-    key = content.get("key")
-    value = content.get("value")
-    storage_name = content.get("storage", "web-apps::annotations")
-
-    app = get_app_by_site(get_target_storage(), site)
-    if not app:
-        return JSONResponse({"added": False, "error": "App not found"}, status_code=404)
-
-    # Use global add_annotation
-    global_add_annotation(
-        entry_id=entry_id,
-        storage_name=storage_name,
-        key=key,
-        value=value,
-        parent_id=app["id"],
-    )
-
-    return JSONResponse({"added": True})
 
 
 @router.post("/getAnnotations")

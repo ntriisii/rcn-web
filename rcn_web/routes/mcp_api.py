@@ -134,3 +134,46 @@ async def describe_target_action():
 
 # This automatically provides /view, /preview, /action, /tools, /prompts
 router = create_mcp_router(storage_resolver=_resolve_storage, prefix="/mcp")
+
+
+@router.post("/describe-target")
+async def describe_target_endpoint(req: Request):
+    from rcn_web.core.utils import get_target_storage
+
+    target_storage = get_target_storage()
+    if not target_storage:
+        return JSONResponse({"error": "No target storage found"}, status_code=404)
+
+    storages_to_check = ["web-apps", "flows", "web-apps::app-links"]
+    storages_results = {}
+
+    for name in storages_to_check:
+        st = _resolve_storage(name)
+        if st is not None:
+            try:
+                count = len(st)
+            except:
+                try:
+                    count = len(st.get())
+                except:
+                    count = 0
+
+            try:
+                entries = st.get()
+                columns = list(entries[0].keys()) if entries else []
+            except:
+                columns = []
+
+            storages_results[name] = {"count": count, "columns": columns}
+        else:
+            storages_results[name] = {"count": 0, "columns": []}
+
+    return JSONResponse(
+        {
+            "target": {
+                "id": getattr(target_storage, "id", None),
+                "site": getattr(target_storage, "site", None),
+            },
+            "storages": storages_results,
+        }
+    )

@@ -18,12 +18,14 @@ def get_default_target():
 
 
 @click.group()
+@click.argument("target", required=False)
 @click.option("--base-url", default=RCN_SERVER_URL, help="RCN server URL")
 @click.pass_context
-def cli(ctx, base_url):
+def cli(ctx, target, base_url):
     """RCN Web CLI tool."""
     ctx.ensure_object(dict)
-    target = get_default_target()
+    if not target:
+        target = get_default_target()
     base_url = f"{base_url.rstrip('/')}/{target}"
     ctx.obj["base_url"] = base_url
 

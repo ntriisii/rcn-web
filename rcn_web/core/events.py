@@ -10,25 +10,6 @@ from rcn_web.core.utils import web_match_storage, get_target_storage, get_target
 from rcn_core.decorators import rcn_event
 
 
-def _resolve_target(item):
-    """Resolve a dict entry from the targets table to a TargetStorage object."""
-    target = item["entry"]
-    
-    if hasattr(target, "storage_md_get"):
-        return target
-        
-    # Plain dict — resolve via parent (MultiTargetStorage)
-    parent = item.get("parent")
-    if parent is None:
-        return None
-    
-    target_name = target.get("name")
-    if not target_name:
-        return None
-    
-    return parent.get_target_storage(target_name)
-
-
 @rcn_event()
 async def handle_init_target(event, scheduled_md):
     event_ctx = event.copy()
@@ -39,11 +20,26 @@ async def handle_init_target(event, scheduled_md):
     async with get_unprocessed_entries(
         "init-recon", event_ctx, target=None, match_storage_fn=web_match_storage
     ) as entries:
+        target_storage = get_target_storage()
         for item in entries.values():
-            target = _resolve_target(item)
-            if target is None:
+            entry = item["entry"]
+            parent = item.get("parent")
+
+            # Resolve ID safely
+            try:
+                entry_id = entry["id"]
+            except (TypeError, KeyError, AttributeError):
+                entry_id = getattr(entry, "id", None)
+
+            if entry_id is None:
                 continue
 
+            # Resolve target object
+            target = None
+            target = target_storage.get_parent_storage_object("targets", entry_id)
+
+            if target is None:
+                continue
             if target.storage_md_get("init-recon-finished"):
                 continue
             if target.storage_md_get("init-recon-running"):
@@ -55,7 +51,14 @@ async def handle_init_target(event, scheduled_md):
 
             flow = flow_fn()
 
-            target_name = target.name
+            try:
+                target_name = entry["name"]
+            except (TypeError, KeyError, AttributeError):
+                target_name = getattr(entry, "name", None)
+
+            if target_name is None:
+                continue
+
             # Use web scope helpers
             cfg = get_target_config(target_name)
             wildcards = get_config_wildcards(cfg)
