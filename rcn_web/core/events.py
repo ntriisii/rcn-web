@@ -35,14 +35,9 @@ async def handle_init_target(event, scheduled_md):
                 continue
 
             # Resolve target object
-            target = None
-            target = target_storage.get_parent_storage_object("targets", entry_id)
-
-            if target is None:
+            if mts.storage_md_get(f"init-recon-finished:{entry_id}"):
                 continue
-            if target.storage_md_get("init-recon-finished"):
-                continue
-            if target.storage_md_get("init-recon-running"):
+            if mts.storage_md_get(f"init-recon-running:{entry_id}"):
                 continue
 
             flow_fn = RCN_FLOWS.get("init-flow")
@@ -66,9 +61,10 @@ async def handle_init_target(event, scheduled_md):
 
             flow.set_data(wildcards)
 
-            target.storage_md_set("init-recon-running", True)
-            target.storage_md_set(
-                "init-recon-started-time", datetime.datetime.now().timestamp()
+            mts.storage_md_set(f"init-recon-running:{entry_id}", True)
+            mts.storage_md_set(
+                f"init-recon-started-time:{entry_id}",
+                datetime.datetime.now().timestamp(),
             )
 
             try:
@@ -94,16 +90,15 @@ async def handle_init_target(event, scheduled_md):
 
                 out = filtered_out
 
-                target_id = target.id
-                domain_st_list = get_storage_create("domains", parent_id=target_id)
+                domain_st_list = get_storage_create("domains", parent_id=entry_id)
                 if domain_st_list:
                     domain_st = domain_st_list[0]
                     domain_st.add_many(
                         [{"domain": i} for i in out], source="init-domains"
                     )
 
-                target.storage_md_set("init-recon-finished", True)
-                target.storage_md_set("init-recon-running", False)
+                mts.storage_md_set(f"init-recon-finished:{entry_id}", True)
+                mts.storage_md_set(f"init-recon-running:{entry_id}", False)
             except Exception as e:
-                target.storage_md_set("init-recon-running", False)
+                mts.storage_md_set(f"init-recon-running:{entry_id}", False)
                 raise e
