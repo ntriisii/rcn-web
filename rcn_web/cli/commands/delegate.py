@@ -29,3 +29,5 @@ def delegate(ctx, app, agent, instructions, storage, ids):
         click.echo(json.dumps(resp.json(), indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+
+

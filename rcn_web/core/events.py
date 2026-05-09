@@ -35,9 +35,9 @@ async def handle_init_target(event, scheduled_md):
                 continue
 
             # Resolve target object
-            if mts.storage_md_get(f"init-recon-finished:{entry_id}"):
+            if mts.storage_md_get(f"init-recon-finished_{entry_id}"):
                 continue
-            if mts.storage_md_get(f"init-recon-running:{entry_id}"):
+            if mts.storage_md_get(f"init-recon-running_{entry_id}"):
                 continue
 
             flow_fn = RCN_FLOWS.get("init-flow")
@@ -61,9 +61,9 @@ async def handle_init_target(event, scheduled_md):
 
             flow.set_data(wildcards)
 
-            mts.storage_md_set(f"init-recon-running:{entry_id}", True)
+            mts.storage_md_set(f"init-recon-running_{entry_id}", True)
             mts.storage_md_set(
-                f"init-recon-started-time:{entry_id}",
+                f"init-recon-started-time_{entry_id}",
                 datetime.datetime.now().timestamp(),
             )
 
@@ -93,12 +93,11 @@ async def handle_init_target(event, scheduled_md):
                 domain_st_list = get_storage_create("domains", parent_id=entry_id)
                 if domain_st_list:
                     domain_st = domain_st_list[0]
-                    domain_st.add_many(
-                        [{"domain": i} for i in out], source="init-domains"
-                    )
+                    domain_st.add_many([{"domain": i} for i in out], source="init-domains")
 
-                mts.storage_md_set(f"init-recon-finished:{entry_id}", True)
-                mts.storage_md_set(f"init-recon-running:{entry_id}", False)
+                mts.storage_md_set(f"init-recon-finished_{entry_id}", True)
+                mts.storage_md_set(f"init-recon-running_{entry_id}", False)
+                
             except Exception as e:
-                mts.storage_md_set(f"init-recon-running:{entry_id}", False)
+                mts.storage_md_set(f"init-recon-running_{entry_id}", False)
                 raise e

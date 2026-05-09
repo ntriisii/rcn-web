@@ -38,19 +38,23 @@ def _resolve_storage_impl(
     if not mts:
         return None
 
+    # Default behavior: If no parent_id is provided, default to viewing the entire table.
+    # We return a storage object with parent_id=None to disable hierarchical filtering.
+    if pid is None:
+        from rcn_core.storage.implementations import BasicDataStorage
+
+        return BasicDataStorage(storage_name=storage_name, parent=mts, parent_id=None)
+
     # 3. Handle hierarchical storages (e.g. web-apps::app-flows)
     if "::" in storage_name:
-        if pid:
-            try:
-                st_list = mts.get_storage_create(storage_name, parent_id=int(pid))
-            except (ValueError, TypeError):
-                st_list = mts.get_storage_create(storage_name, parent_id=pid)
-            return st_list[0] if st_list else None
-        st_list = mts.get_storage_create(storage_name)
+        try:
+            st_list = mts.get_storage_create(storage_name, parent_id=int(pid))
+        except (ValueError, TypeError):
+            st_list = mts.get_storage_create(storage_name, parent_id=pid)
         return st_list[0] if st_list else None
 
     # 4. Top-level resolution
-    st_list = mts.get_storage_create(storage_name)
+    st_list = mts.get_storage_create(storage_name, parent_id=pid)
     return st_list[0] if st_list else None
 
 
@@ -107,7 +111,13 @@ async def describe_target_action():
             # Use storage methods for consistent data retrieval
             count = 0
             try:
-                count = len(st)
+                # Use storage_length() if available (total physical entries)
+                # otherwise fallback to scoped len(st)
+                if hasattr(st, "storage_length"):
+                    count = st.storage_length()
+                    # print(f"DEBUG: {storage_name} storage_length={count}")
+                else:
+                    count = len(st)
             except (TypeError, AttributeError):
                 # Fallback for adapters that don't support len()
                 try:
