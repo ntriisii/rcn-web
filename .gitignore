@@ -124,6 +124,8 @@ dmypy.json
 .vscode/
 .idea/
 
+uv.lock
+
 # Python cache and compiled files
 __pycache__/
 *.pyc
