@@ -275,7 +275,8 @@ def add_apps(target_storage_obj, apps: "list[dict]"):
     for app_data in apps:
         # Extract only required keys
         filtered_app = {k: app_data[k] for k in required_keys if k in app_data}
-
+        if "tech" not in filtered_app: filtered_app['tech'] = []
+        
         domain = filtered_app.get("input")
         if not domain:
             url = (
